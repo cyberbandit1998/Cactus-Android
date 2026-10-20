@@ -18,7 +18,7 @@ data class PlannerPolicy(
     val maxSteps: Int = 4,
 )
 
-enum class RefusalKind { NOTHING_MATCHED, INVALID_CALL, TOO_MANY_STEPS, ENGINE_ERROR, NEGATED }
+enum class RefusalKind { NOTHING_MATCHED, INVALID_CALL, TOO_MANY_STEPS, ENGINE_ERROR, NEGATED, HELD_BACK }
 
 enum class Hint { ENABLE_SCREEN_CONTROL }
 
@@ -26,8 +26,12 @@ sealed interface PlanOutcome {
     /** Safe to run now. */
     data class Run(val steps: List<ValidatedCall>) : PlanOutcome
 
-    /** Show these steps and the reasons; run only after the user agrees. */
-    data class NeedsConfirmation(val steps: List<ValidatedCall>, val reasons: List<String>) : PlanOutcome
+    /**
+     * Show these steps and the reasons; run only after the user agrees. [suppressed] is true when the engine held
+     * the call back itself (confidence below its floor or a grounding gate fired): callers that act automatically
+     * must never run such a call.
+     */
+    data class NeedsConfirmation(val steps: List<ValidatedCall>, val reasons: List<String>, val suppressed: Boolean = false) : PlanOutcome
 
     /** Nothing will run. [message] is written for the user; [details] is for the debug view. */
     data class Refused(
@@ -52,10 +56,12 @@ object Planner {
 
         val confirmReasons = mutableListOf<String>()
         val rawCalls: List<RawCall>
+        var fromSuppressed = false
         if (response.calls.isNotEmpty()) {
             rawCalls = response.calls
         } else if (response.suppressedCalls.isNotEmpty()) {
             rawCalls = response.suppressedCalls
+            fromSuppressed = true
             confirmReasons += "The model was not sure about this one."
         } else {
             return refusedNothing(userText, policy)
@@ -111,7 +117,7 @@ object Planner {
         return if (confirmReasons.isEmpty()) {
             PlanOutcome.Run(optimised)
         } else {
-            PlanOutcome.NeedsConfirmation(optimised, confirmReasons.distinct())
+            PlanOutcome.NeedsConfirmation(optimised, confirmReasons.distinct(), suppressed = fromSuppressed)
         }
     }
 

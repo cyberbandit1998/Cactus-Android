@@ -29,6 +29,20 @@ object AssistantTools {
     const val TYPE_TEXT = "type_text"
     const val FIND_ON_SCREEN = "find_on_screen"
 
+    // Information tools. They only ever read; none of them starts an app, a call or a message.
+    const val GET_TIME = "get_time"
+    const val GET_DATE = "get_date"
+    const val DEVICE_INFO = "device_info"
+    const val CALCULATE = "calculate"
+    const val SPORTS_INFO = "sports_info"
+    const val WEATHER_INFO = "weather_info"
+    const val ANSWER_QUESTION = "answer_question"
+
+    val DEVICE_TOPICS = listOf("charging", "android_version", "storage", "model")
+    val SPORTS_LEAGUES = listOf("nfl", "mlb", "nhl", "nba", "college_football", "college_basketball")
+    val SPORTS_WHEN = listOf("today", "yesterday", "tomorrow", "next", "last")
+    val WEATHER_WHEN = listOf("today", "tomorrow", "weekend")
+
     val SETTINGS_PAGES = listOf(
         "main", "wifi", "bluetooth", "display", "battery", "sound", "location", "apps", "storage",
         "airplane_mode", "nfc", "date_time", "accessibility",
@@ -206,4 +220,76 @@ object AssistantTools {
 
     /** Facts passed to `needle_init`, never instructions (Needle 3 rule). */
     fun systemFacts(date: String, locale: String): String = "date: $date; locale: $locale; device: phone"
+
+    /**
+     * Answers that need no phone action. Kept separate from [registry] so the phone-action list (and its tests) stay as
+     * they were; [full] is what the app gives Needle. Descriptions are short on purpose: the whole list is read by the
+     * model on every setup and has to fit its context window.
+     */
+    val information: List<ToolSpec> = listOf(
+        ToolSpec(
+            name = GET_TIME,
+            description = "Tell the current time, here or in another place.",
+            params = listOf(ParamSpec("place", ParamType.STRING, "A place such as California or Tokyo. Omit for here.", maxLength = 60)),
+            group = ToolGroup.INFO,
+            sensitivity = Sensitivity.SAFE,
+            triggers = listOf("\\btime is it\\b", "\\bcurrent time\\b", "\\bwhat'?s the time\\b", "\\btime in [a-z]"),
+        ),
+        ToolSpec(
+            name = GET_DATE,
+            description = "Tell today's date, or the weekday, date and days away of a day such as tomorrow or Christmas.",
+            params = listOf(ParamSpec("day", ParamType.STRING, "The day or holiday the user named. Omit for today.", maxLength = 60)),
+            group = ToolGroup.INFO,
+            sensitivity = Sensitivity.SAFE,
+            triggers = listOf("\\bdays? (until|till|since)\\b", "\\btoday'?s date\\b"),
+        ),
+        ToolSpec(
+            name = DEVICE_INFO,
+            description = "Report a fact about this phone: charging, Android version, storage left or model.",
+            params = listOf(ParamSpec("topic", ParamType.STRING, "Which fact.", required = true, enumValues = DEVICE_TOPICS)),
+            group = ToolGroup.INFO,
+            sensitivity = Sensitivity.SAFE,
+            triggers = listOf("\\bcharging\\b", "\\bandroid version\\b", "\\b(storage|space) (left|free|remaining)\\b"),
+        ),
+        ToolSpec(
+            name = CALCULATE,
+            description = "Work out arithmetic such as 15 percent of 80 or 12 times 7.",
+            params = listOf(ParamSpec("expression", ParamType.STRING, "The calculation as the user said it.", required = true, maxLength = 100)),
+            group = ToolGroup.INFO,
+            sensitivity = Sensitivity.SAFE,
+            triggers = listOf("\\d\\s*(plus|minus|times|divided by|multiplied by|percent of|% of)\\s*\\d", "\\bsquare root\\b"),
+        ),
+        ToolSpec(
+            name = SPORTS_INFO,
+            description = "Look up a team's score, result or schedule in the NFL, MLB, NHL, NBA or college football or basketball.",
+            params = listOf(
+                ParamSpec("team", ParamType.STRING, "The team as the user said it, such as Tigers.", maxLength = 60),
+                ParamSpec("league", ParamType.STRING, "The league, if the user named one.", enumValues = SPORTS_LEAGUES),
+                ParamSpec("when", ParamType.STRING, "Which game. Omit for the current or latest one.", enumValues = SPORTS_WHEN),
+            ),
+            group = ToolGroup.ONLINE,
+            sensitivity = Sensitivity.SAFE,
+        ),
+        ToolSpec(
+            name = WEATHER_INFO,
+            description = "Get the weather for a place from a web search.",
+            params = listOf(
+                ParamSpec("place", ParamType.STRING, "A city or place. Omit for here.", maxLength = 60),
+                ParamSpec("when", ParamType.STRING, "Which day. Omit for today.", enumValues = WEATHER_WHEN),
+            ),
+            group = ToolGroup.ONLINE,
+            sensitivity = Sensitivity.SAFE,
+            triggers = listOf("\\bweather\\b", "\\bforecast\\b"),
+        ),
+        ToolSpec(
+            name = ANSWER_QUESTION,
+            description = "Answer a factual question such as who, what, when or how far by searching the web. Not for requests to search.",
+            params = listOf(ParamSpec("question", ParamType.STRING, "The question, copied word for word.", required = true, maxLength = 300)),
+            group = ToolGroup.ONLINE,
+            sensitivity = Sensitivity.SAFE,
+        ),
+    )
+
+    /** Everything the assistant can be asked: phone actions, screen control and information. */
+    val full: ToolRegistry = ToolRegistry(registry.tools + information)
 }

@@ -1,5 +1,6 @@
 package app.cactusai.core.history
 
+import app.cactusai.core.exec.ExecutionMode
 import app.cactusai.core.json.Json
 import app.cactusai.core.json.JsonValue
 import app.cactusai.core.json.jsonObjectOf
@@ -24,6 +25,12 @@ data class HistoryEntry(
     val outcome: Outcome,
     val message: String,
     val timings: Timings?,
+    /** Whether the command ran by itself or after the user said yes; null when nothing ran. */
+    val mode: ExecutionMode? = null,
+    /** Needle's own confidence for this command, or null when it reported none. */
+    val confidence: Double? = null,
+    /** True when the answer came from an online search. */
+    val online: Boolean = false,
 )
 
 object HistoryCodec {
@@ -46,6 +53,9 @@ object HistoryCodec {
             "interpretation" to e.interpretation,
             "outcome" to e.outcome,
             "message" to e.message,
+            "mode" to e.mode,
+            "conf" to e.confidence?.takeIf { it.isFinite() },
+            "online" to e.online,
             "timings" to t?.let {
                 jsonObjectOf(
                     "load" to it.modelLoadMs, "record" to it.recordMs, "transcribe" to it.transcribeMs,
@@ -70,7 +80,12 @@ object HistoryCodec {
                 needlePrefillTps = it.double("nPrefill"), needleDecodeTps = it.double("nTps"),
             )
         }
-        return HistoryEntry(id, time, source, o.string("text").orEmpty(), o.string("interpretation"), outcome, o.string("message").orEmpty(), t)
+        return HistoryEntry(
+            id, time, source, o.string("text").orEmpty(), o.string("interpretation"), outcome, o.string("message").orEmpty(), t,
+            mode = enumOrNull<ExecutionMode>(o.string("mode")),
+            confidence = o.double("conf")?.takeIf { it in 0.0..1.0 },
+            online = o.bool("online") ?: false,
+        )
     }
 
     private inline fun <reified E : Enum<E>> enumOrNull(name: String?): E? =

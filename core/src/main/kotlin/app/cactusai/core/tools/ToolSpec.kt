@@ -8,8 +8,12 @@ import app.cactusai.core.json.JsonValue
  */
 enum class ToolDetail { FULL, COMPACT, MINIMAL }
 
-/** Which tools the model is shown. SCREEN tools need the user-enabled accessibility service. */
-enum class ToolGroup { PHONE, SCREEN }
+/**
+ * Which tools the model is shown. SCREEN tools need the user-enabled accessibility service. INFO tools are answered
+ * entirely on the phone (time, date, device facts, arithmetic). ONLINE tools (sports, weather, general questions) are
+ * answered from a web search the user switched on; their questions are the only thing that ever leaves the phone.
+ */
+enum class ToolGroup { PHONE, SCREEN, INFO, ONLINE }
 
 enum class Sensitivity {
     /** May run as soon as the model is confident. Android itself still shows its own UI where it applies. */
