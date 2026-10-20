@@ -1,5 +1,8 @@
 package app.cactusai.core.engine
 
+const val KIND_TEXT = 1
+const val KIND_SPEECH = 2
+
 sealed interface EngineResult<out T> {
     data class Ok<T>(val value: T) : EngineResult<T>
     data class Err(val message: String) : EngineResult<Nothing>
@@ -17,6 +20,9 @@ interface InferenceEngine {
 
     /** Loads a `.cact` archive; the engine works out whether it is Needle or Whistle. */
     fun loadModel(path: String): EngineResult<Unit>
+
+    /** What the engine reports as loaded right now: a bitmask of [KIND_TEXT] and [KIND_SPEECH] (`needle_models`). */
+    fun loadedKinds(): Int
 
     /** Sets the facts and tool list for the Needle conversation. Returns the prompt prefix length in tokens. */
     fun initNeedle(systemFacts: String, toolsJson: String): EngineResult<Int>

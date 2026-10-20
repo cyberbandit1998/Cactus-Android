@@ -2,6 +2,9 @@ package app.cactusai.core.tools
 
 import app.cactusai.core.json.JsonValue
 
+/** How much wording goes into the tool list the model reads. Shorter levels are fallbacks for a small context window. */
+enum class ToolDetail { FULL, COMPACT, MINIMAL }
+
 /** Which tools the model is shown. SCREEN tools need the user-enabled accessibility service. */
 enum class ToolGroup { PHONE, SCREEN }
 

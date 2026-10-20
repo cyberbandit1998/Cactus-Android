@@ -9,7 +9,7 @@ import java.nio.ByteOrder
  * models. It contains no model weights and can never be loaded by the engine.
  */
 object SyntheticCact {
-    fun build(tensors: Int = 3, codebookWords: Int = 4, dataPerTensor: Int = 1000, tag: Int = 0x05E12A84): ByteArray {
+    fun build(tensors: Int = 3, codebookWords: Int = 4, dataPerTensor: Int = 1000, tag: Int = 0x05E12A84, testKind: Int = 0): ByteArray {
         val header = 196
         val tableStart = header + codebookWords * 4
         val dataStart = tableStart + tensors * 44
@@ -18,6 +18,7 @@ object SyntheticCact {
         buf.putInt(0, tag)
         buf.putInt(4, tensors)
         buf.putInt(8, codebookWords)
+        buf.putInt(12, testKind) // only the host-test engine double reads this: 1 = text, 2 = speech
         for (i in 0 until tensors) {
             val rec = tableStart + i * 44
             buf.putLong(rec + 20, (dataStart + i * dataPerTensor).toLong())

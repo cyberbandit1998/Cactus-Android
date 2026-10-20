@@ -21,9 +21,13 @@ class ToolRegistry(val tools: List<ToolSpec>) {
 
     fun enabled(groups: Set<ToolGroup>): List<ToolSpec> = tools.filter { it.group in groups }
 
-    /** The `tools` array handed to `needle_init` (the engine's raw JSON-schema form, plus `triggers`). */
-    fun toNeedleToolsJson(groups: Set<ToolGroup>): String =
-        Json.write(JsonValue.Arr(enabled(groups).map(::schemaOf)))
+    /**
+     * The `tools` array handed to `needle_init` (the engine's raw JSON-schema form, plus `triggers`).
+     * The engine reads the whole list as part of its prompt and `needle_init` fails if it does not fit the
+     * context window, so shorter [ToolDetail] levels exist as fallbacks.
+     */
+    fun toNeedleToolsJson(groups: Set<ToolGroup>, detail: ToolDetail = ToolDetail.FULL): String =
+        Json.write(JsonValue.Arr(enabled(groups).map { schemaOf(it, detail) }))
 
     /** Stable fingerprint of what the engine was initialised with, so unchanged tool sets are not re-initialised. */
     fun signature(groups: Set<ToolGroup>): String {
@@ -93,16 +97,18 @@ class ToolRegistry(val tools: List<ToolSpec>) {
         }
     }
 
+    private fun firstSentence(text: String): String = text.substringBefore(". ").removeSuffix(".")
+
     private fun rejected(tool: String?, reason: String) = ValidationResult.Rejected(tool, reason)
 
     private fun display(s: String): String = s.take(40).filter { it in ' '..'~' }
 
-    private fun schemaOf(tool: ToolSpec): JsonValue.Obj {
+    private fun schemaOf(tool: ToolSpec, detail: ToolDetail): JsonValue.Obj {
         val props = LinkedHashMap<String, Any?>()
         for (p in tool.params) {
             val prop = LinkedHashMap<String, Any?>()
             prop["type"] = if (p.type == ParamType.INTEGER) "integer" else "string"
-            prop["description"] = p.description
+            if (detail == ToolDetail.FULL) prop["description"] = p.description
             if (p.enumValues.isNotEmpty()) prop["enum"] = p.enumValues
             p.min?.let { prop["minimum"] = it }
             p.max?.let { prop["maximum"] = it }
@@ -115,7 +121,7 @@ class ToolRegistry(val tools: List<ToolSpec>) {
         if (required.isNotEmpty()) parameters["required"] = required
         val schema = LinkedHashMap<String, Any?>()
         schema["name"] = tool.name
-        schema["description"] = tool.description
+        schema["description"] = if (detail == ToolDetail.MINIMAL) firstSentence(tool.description) else tool.description
         schema["parameters"] = parameters
         if (tool.triggers.isNotEmpty()) schema["triggers"] = tool.triggers
         return jsonOf(schema) as JsonValue.Obj

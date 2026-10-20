@@ -15,6 +15,7 @@ std::string g_system;
 std::string g_tools;
 int g_loads = 0;
 int g_resets = 0;
+int g_kinds = 0;
 
 int write_out(const std::string& s, char* out, int cap) {
     if (static_cast<int>(s.size()) + 1 > cap) {
@@ -28,7 +29,9 @@ int write_out(const std::string& s, char* out, int cap) {
 
 extern "C" {
 
-int needle_load(const void* bytes, uint64_t size) {
+int needle_models(void) { return g_kinds; }
+
+int needle_load(const unsigned char* bytes, unsigned long long size) {
     g_error.clear();
     if (!bytes || size < 196) {
         g_error = "archive too small";
@@ -41,8 +44,12 @@ int needle_load(const void* bytes, uint64_t size) {
         return -2;
     }
     // Reads the last byte to prove the whole region is readable memory.
-    volatile unsigned char last = static_cast<const unsigned char*>(bytes)[size - 1];
+    volatile unsigned char last = bytes[size - 1];
     (void)last;
+    // The test fixture marks the kind in header word 3: 1 = text (Needle), 2 = speech (Whistle).
+    uint32_t kind;
+    std::memcpy(&kind, bytes + 12, 4);
+    g_kinds |= static_cast<int>(kind & 3u);
     ++g_loads;
     return 0;
 }

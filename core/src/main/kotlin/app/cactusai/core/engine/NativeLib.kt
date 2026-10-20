@@ -38,6 +38,8 @@ object NativeLib {
 
     @JvmStatic external fun nativeLoadModel(path: String): Int
 
+    @JvmStatic external fun nativeLoadedKinds(): Int
+
     @JvmStatic external fun nativeInit(system: String, toolsJson: String): Int
 
     @JvmStatic external fun nativeComplete(text: String, maxNewTokens: Int): String?
@@ -62,6 +64,10 @@ class NativeEngine : InferenceEngine {
     override fun loadModel(path: String): EngineResult<Unit> = lock.withLock {
         ensureLoaded()?.let { return EngineResult.Err(it) }
         if (NativeLib.nativeLoadModel(path) < 0) EngineResult.Err(NativeLib.nativeLastError()) else EngineResult.Ok(Unit)
+    }
+
+    override fun loadedKinds(): Int = lock.withLock {
+        if (ensureLoaded() == null) NativeLib.nativeLoadedKinds() else 0
     }
 
     override fun initNeedle(systemFacts: String, toolsJson: String): EngineResult<Int> = lock.withLock {

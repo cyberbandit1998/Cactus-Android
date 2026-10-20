@@ -2,6 +2,9 @@ package app.cactusai.assistant.engine
 
 import app.cactusai.core.engine.EngineResult
 import app.cactusai.core.engine.InferenceEngine
+import app.cactusai.core.engine.KIND_SPEECH
+import app.cactusai.core.engine.KIND_TEXT
+import app.cactusai.core.models.ModelKind
 import app.cactusai.core.models.ModelSpec
 import app.cactusai.core.models.ModelStatus
 import app.cactusai.core.models.ModelStore
@@ -13,6 +16,7 @@ import app.cactusai.core.needle.TranscriptionParse
 import app.cactusai.core.needle.TranscriptionResult
 import app.cactusai.core.needle.Transcriptions
 import app.cactusai.core.tools.AssistantTools
+import app.cactusai.core.tools.ToolDetail
 import app.cactusai.core.tools.ToolGroup
 import app.cactusai.core.tools.ToolRegistry
 import java.text.SimpleDateFormat
@@ -44,6 +48,10 @@ data class EngineState(
     /** Prompt prefix length the engine reported when the tools were set up. */
     val needlePrefixTokens: Int? = null,
     val needleInitMs: Long? = null,
+    /** How much wording of the tool list the engine accepted (shorter levels are fallbacks). */
+    val toolDetail: ToolDetail? = null,
+    /** True when even the shortest list did not fit with the screen tools, so they were left out. */
+    val screenToolsLeftOut: Boolean = false,
 )
 
 enum class FailureKind { NOT_LINKED, MODEL_MISSING, LOAD_FAILED, INFERENCE_FAILED, BAD_OUTPUT }
@@ -55,7 +63,14 @@ sealed interface HostResult<out T> {
 
 data class TranscribeOutput(val result: TranscriptionResult, val wallMs: Long, val loadMs: Long?)
 
-data class InterpretOutput(val response: NeedleResponse, val wallMs: Long, val loadMs: Long?, val initMs: Long?)
+data class InterpretOutput(
+    val response: NeedleResponse,
+    val wallMs: Long,
+    val loadMs: Long?,
+    val initMs: Long?,
+    /** The tool groups Needle was actually given; the planner must validate against these. */
+    val effectiveGroups: Set<ToolGroup>,
+)
 
 /**
  * Owns the engine. Every native call runs on one dedicated thread because the engine is not
@@ -78,6 +93,7 @@ class EngineHost(
 
     // Touched only on the engine thread.
     private var initializedSignature: String? = null
+    private var initializedGroups: Set<ToolGroup> = emptySet()
 
     val isLinked: Boolean get() = engine.isLinked
 
@@ -132,7 +148,7 @@ class EngineHost(
                         val wallMs = elapsedMs(start)
                         return@withContext when (val p = NeedleResponses.parse(r.value)) {
                             is NeedleParse.Malformed -> HostResult.Fail(FailureKind.BAD_OUTPUT, "The command model returned something I could not read (${p.reason}).", r.value)
-                            is NeedleParse.Parsed -> HostResult.Ok(InterpretOutput(p.response, wallMs, loadMs, initMs))
+                            is NeedleParse.Parsed -> HostResult.Ok(InterpretOutput(p.response, wallMs, loadMs, initMs, initializedGroups))
                         }
                     }
                 }
@@ -152,7 +168,10 @@ class EngineHost(
 
     /** Returns the load time in ms when this call loaded the model, null when it was already loaded. */
     private fun ensureLoaded(spec: ModelSpec): HostResult<Long?> {
-        if (runtime(spec).stage == LoadStage.LOADED) return HostResult.Ok(null)
+        val bit = if (spec.kind == ModelKind.NEEDLE) KIND_TEXT else KIND_SPEECH
+        // Trust the engine's own report (needle_models), not just our bookkeeping.
+        if (runtime(spec).stage == LoadStage.LOADED && (engine.loadedKinds() and bit) != 0) return HostResult.Ok(null)
+
         val installed = when (val status = store.status(spec)) {
             is ModelStatus.Installed -> status
             ModelStatus.NotInstalled, is ModelStatus.Partial ->
@@ -169,33 +188,59 @@ class EngineHost(
             }
             is EngineResult.Ok -> {
                 val ms = elapsedMs(start)
+                if ((engine.loadedKinds() and bit) == 0) {
+                    val why = "The engine took the file but does not report ${spec.displayName} as loaded. Is it the right file?"
+                    setRuntime(spec, ModelRuntime(LoadStage.FAILED, error = why))
+                    return HostResult.Fail(FailureKind.LOAD_FAILED, why)
+                }
                 setRuntime(spec, ModelRuntime(LoadStage.LOADED, loadMs = ms, loadedSha = installed.sha256))
+                if (spec.kind == ModelKind.NEEDLE) initializedSignature = null // a fresh model needs its tools set up again
                 HostResult.Ok(ms)
             }
         }
     }
 
-    /** Sets the facts and tools up for Needle; returns the time taken when it actually ran. */
+    /**
+     * Sets the facts and tools up for Needle; returns the time taken when it actually ran.
+     *
+     * `needle_init` fails when the prompt does not fit the context window, and the size of this
+     * assistant's tool list versus that window cannot be known without the phone. So it tries the full
+     * wording first, then shorter wording, and as a last resort leaves out the optional screen tools,
+     * remembering which worked.
+     */
     private fun ensureInitialised(groups: Set<ToolGroup>): HostResult<Long?> {
         val facts = AssistantTools.systemFacts(today(), localeTag())
         val signature = registry.signature(groups) + "|" + facts
         if (signature == initializedSignature) return HostResult.Ok(null)
+
+        val ladder = buildList {
+            ToolDetail.entries.forEach { add(groups to it) }
+            if (ToolGroup.SCREEN in groups) add((groups - ToolGroup.SCREEN) to ToolDetail.MINIMAL)
+        }
         val start = System.nanoTime()
-        return when (val r = engine.initNeedle(facts, registry.toNeedleToolsJson(groups))) {
-            is EngineResult.Err -> HostResult.Fail(FailureKind.INFERENCE_FAILED, "The command model could not be set up: ${r.message}")
-            is EngineResult.Ok -> {
-                initializedSignature = signature
-                val ms = elapsedMs(start)
-                _state.value = _state.value.copy(needlePrefixTokens = r.value, needleInitMs = ms)
-                HostResult.Ok(ms)
+        var lastError = "unknown error"
+        for ((tryGroups, detail) in ladder) {
+            when (val r = engine.initNeedle(facts, registry.toNeedleToolsJson(tryGroups, detail))) {
+                is EngineResult.Err -> lastError = r.message
+                is EngineResult.Ok -> {
+                    initializedSignature = signature
+                    initializedGroups = tryGroups
+                    val ms = elapsedMs(start)
+                    _state.value = _state.value.copy(
+                        needlePrefixTokens = r.value, needleInitMs = ms, toolDetail = detail,
+                        screenToolsLeftOut = ToolGroup.SCREEN in groups && ToolGroup.SCREEN !in tryGroups,
+                    )
+                    return HostResult.Ok(ms)
+                }
             }
         }
+        return HostResult.Fail(FailureKind.INFERENCE_FAILED, "The command model could not be set up with any version of the tool list: $lastError")
     }
 
-    private fun runtime(spec: ModelSpec) = if (spec.kind == Models.NEEDLE_3.kind) _state.value.needle else _state.value.whistle
+    private fun runtime(spec: ModelSpec) = if (spec.kind == ModelKind.NEEDLE) _state.value.needle else _state.value.whistle
 
     private fun setRuntime(spec: ModelSpec, r: ModelRuntime) {
-        _state.value = if (spec.kind == Models.NEEDLE_3.kind) _state.value.copy(needle = r) else _state.value.copy(whistle = r)
+        _state.value = if (spec.kind == ModelKind.NEEDLE) _state.value.copy(needle = r) else _state.value.copy(whistle = r)
     }
 
     private fun elapsedMs(startNanos: Long) = (System.nanoTime() - startNanos) / 1_000_000

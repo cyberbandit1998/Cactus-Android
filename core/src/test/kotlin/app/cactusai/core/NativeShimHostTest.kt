@@ -67,6 +67,16 @@ class NativeShimHostTest {
     }
 
     @Test
+    fun bothModelKindsStayLoadedTogether() {
+        assertTrue(engine.loadModel(modelFile(SyntheticCact.build(testKind = 1))) is EngineResult.Ok)
+        assertTrue(engine.loadedKinds() and app.cactusai.core.engine.KIND_TEXT != 0)
+        assertTrue(engine.loadModel(modelFile(SyntheticCact.build(testKind = 2))) is EngineResult.Ok)
+        val kinds = engine.loadedKinds()
+        assertTrue("text model must stay loaded after the speech model", kinds and app.cactusai.core.engine.KIND_TEXT != 0)
+        assertTrue(kinds and app.cactusai.core.engine.KIND_SPEECH != 0)
+    }
+
+    @Test
     fun reportsModelLoadFailuresWithReasons() {
         assertTrue(err(engine.loadModel("/definitely/not/here.cact")).contains("cannot open"))
         assertTrue(err(engine.loadModel(modelFile(ByteArray(300)))).contains("unknown format tag"))

@@ -215,8 +215,8 @@ class AssistantController(
             return
         }
 
-        val groups = if (ScreenControl.isAvailable) setOf(ToolGroup.PHONE, ToolGroup.SCREEN) else setOf(ToolGroup.PHONE)
-        val interpreted = when (val r = engine.interpret(text, groups)) {
+        val requestedGroups = if (ScreenControl.isAvailable) setOf(ToolGroup.PHONE, ToolGroup.SCREEN) else setOf(ToolGroup.PHONE)
+        val interpreted = when (val r = engine.interpret(text, requestedGroups)) {
             is HostResult.Fail -> {
                 fail(text, source, r.message, timings, rawJson = r.raw)
                 return
@@ -231,7 +231,8 @@ class AssistantController(
         )
 
         val s = settings.current
-        val policy = PlannerPolicy(actThreshold = s.actThreshold.toDouble(), confirmCallsAndTexts = s.confirmCallsAndTexts, groups = groups)
+        // Validate against what Needle was really given (the screen tools may have been left out to fit its context).
+        val policy = PlannerPolicy(actThreshold = s.actThreshold.toDouble(), confirmCallsAndTexts = s.confirmCallsAndTexts, groups = interpreted.effectiveGroups)
         val plan = Planner.plan(text, interpreted.response, registry, policy)
         val raw = prettyJson(interpreted.response)
         when (plan) {

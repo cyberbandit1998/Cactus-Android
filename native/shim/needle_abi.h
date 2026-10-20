@@ -1,40 +1,44 @@
-// C ABI of the official Needle engine (libneedle), as used by the upstream Python package
-// (cactus-compute/needle: needle/_worker.py, needle/__init__.py, needle/agent/whistle.py,
-// engine 3.3.3). These are declarations only, written from those verified ctypes bindings.
-// We deliberately do not include the engine's own header: it is not available to review here,
-// and C linkage does not depend on it.
+// C ABI of the official Needle engine (libneedle), declared to match the vendor header needle.h
+// that ships with the engine (Cactus-Compute/needle3, folder android-arm64/, commit d6c7d6a2e965).
+// That header was printed by this project's CI run and compared with these declarations; the same
+// functions are defined in libneedle.a. We keep our own copy instead of including the vendor file so
+// the build does not depend on the header's exact text, and we declare only what the app uses.
 //
-// Not used by this app: needle_embed, needle_stream_transcribe_process, needle_stream_transcribe_stop.
+// Not used by this app: needle_embed, needle_set_audio, needle_stream_transcribe_process,
+// needle_stream_transcribe_stop.
 #ifndef CACTUSAI_NEEDLE_ABI_H
 #define CACTUSAI_NEEDLE_ABI_H
-
-#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-// Loads a .cact archive (Needle 3 or Whistle; the engine tells them apart). Returns < 0 on error.
-int needle_load(const void* cact_bytes, uint64_t size);
+#define NEEDLE_TEXT 1
+#define NEEDLE_SPEECH 2
 
-// Text of the last error, or NULL.
+// One process-global, non-thread-safe model per kind. Loads whichever kind the .cact holds and keeps
+// the other kind, so Needle and Whistle take one call each. Negative on failure.
+int needle_load(const unsigned char* cact, unsigned long long n);
+
+// Bitmask of NEEDLE_TEXT / NEEDLE_SPEECH for the models loaded in this process.
+int needle_models(void);
+
+// Last process-global error; owned by the runtime and valid until the next API call. May be NULL.
 const char* needle_last_error(void);
 
-// Sets the facts and the tools JSON for the Needle conversation. Returns the prompt prefix length
-// in tokens (>= 0) or < 0 on error. tool_index_path must be NULL for Needle 3.
-int needle_init(const char* system, const char* tools_json, const char* tool_index_path);
+// Returns the tokenized static-prefix length. Fails when the system prompt plus the tools do not fit
+// the context window. tool_index_path may be NULL.
+int needle_init(const char* system_prompt, const char* tools_json, const char* tool_index_path);
 
-// One Needle turn. audio may be NULL with n_audio 0. Writes a NUL-terminated JSON envelope to out.
-// Returns < 0 on error (out may then hold a message).
-int needle_complete(const char* text, const float* audio, int n_audio, int max_new_tokens,
-                    char* out, int out_capacity);
+// Exactly one of input and pcm is non-null. Writes a NUL-terminated JSON envelope to out.
+int needle_complete(const char* input, const float* pcm, int samples, int max_new_tokens, char* out, int out_capacity);
 
-// Starts a fresh conversation, keeping the tools.
 void needle_reset(void);
 
-// Whistle: 16 kHz mono float samples in [-1, 1]. language may be NULL (detect). keywords may be NULL.
-// Writes a NUL-terminated JSON object {"text","language","ttft_ms","decode_tps"[,"words"]} to out.
-int needle_transcribe(const float* samples, int n_samples, const char* language, const char* keywords,
+// 16 kHz mono float PCM in [-1, 1]. language: "en","de","fr","es","it","nl","pl" or NULL to detect.
+// keywords: NULL or newline-separated words/phrases. Returns the transcript's token count (>= 0) or < 0.
+// out receives {"text":"...","language":"en","ttft_ms":0.0,"decode_tps":0.0}.
+int needle_transcribe(const float* pcm, int samples, const char* language, const char* keywords,
                       int word_timestamps, char* out, int out_capacity);
 
 #ifdef __cplusplus

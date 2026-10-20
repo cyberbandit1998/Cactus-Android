@@ -81,14 +81,41 @@ jobs:
         if: always() && runner.os == 'Linux'
         shell: bash
         run: |
-          cat native-engine/android-arm64/ENGINE_SOURCE.txt || true
           NM="$(ls "$ANDROID_HOME"/ndk/*/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-nm 2>/dev/null | tail -1)"
-          echo "==== needle.h (the vendor header)"
-          cat native-engine/android-arm64/needle.h || true
-          echo "==== functions defined by libneedle.a"
-          "$NM" -g --defined-only native-engine/android-arm64/libneedle.a 2>/dev/null | grep -E ' [TtWw] ' | sort -u | head -120 || true
-          echo "==== symbols libneedle.a expects from the system or the C++ runtime"
-          "$NM" -g -u native-engine/android-arm64/libneedle.a 2>/dev/null | sort -u | head -120 || true
+          LIB=native-engine/android-arm64/libneedle.a
+          echo "==== exported C API of libneedle.a"
+          "$NM" -g --defined-only "$LIB" 2>/dev/null | grep -E ' T needle_' | sort -u || true
+          echo "==== C-level functions libneedle.a expects from the system (no C++ names)"
+          "$NM" -g -u "$LIB" 2>/dev/null | grep -v ' _Z' | awk '{print $2}' | sort -u | tr '\n' ' ' || true
+          echo
+          echo "==== networking / process / dynamic-loading symbols in libneedle.a (empty result = none found)"
+          "$NM" -g -u "$LIB" 2>/dev/null | grep -Ei 'socket|connect|getaddrinfo|gethostby|curl|ssl|tls|sendto|sendmsg|recvfrom|recvmsg|dlopen|popen|system|exec|fork|http' || echo "none found"
+          echo "==== URLs embedded in libneedle.a (empty result = none found)"
+          strings -a "$LIB" | grep -Eio 'https?://[^ "]{4,80}' | sort -u | head -30 || true
+          echo "(end)"
+
+      - name: Lint summary
+        if: always() && runner.os == 'Linux'
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import os
+          import xml.etree.ElementTree as ET
+          p = 'app/build/reports/lint-results-debug.xml'
+          if not os.path.exists(p):
+              print('no lint XML found')
+              raise SystemExit
+          rows = []
+          for issue in ET.parse(p).getroot().iter('issue'):
+              loc = issue.find('location')
+              where = ''
+              if loc is not None:
+                  where = loc.get('file', '').split('Cactus-Android/')[-1] + ':' + loc.get('line', '')
+              rows.append((issue.get('severity', ''), issue.get('id', ''), issue.get('message', '')[:150], where))
+          print(len(rows), 'lint issues')
+          for r in sorted(rows):
+              print(' | '.join(r))
+          PY
 
       - name: Show the APK
         shell: bash

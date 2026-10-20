@@ -46,6 +46,31 @@ class ToolRegistryTest {
     }
 
     @Test
+    fun shorterDetailLevelsAreStrictlySmallerAndStayValid() {
+        val full = reg.toNeedleToolsJson(both, app.cactusai.core.tools.ToolDetail.FULL)
+        val compact = reg.toNeedleToolsJson(both, app.cactusai.core.tools.ToolDetail.COMPACT)
+        val minimal = reg.toNeedleToolsJson(both, app.cactusai.core.tools.ToolDetail.MINIMAL)
+        assertTrue(compact.length < full.length && minimal.length < compact.length)
+        for (json in listOf(full, compact, minimal)) {
+            val tools = (Json.parse(json) as JsonValue.Arr).items.map { it as JsonValue.Obj }
+            assertEquals(17, tools.size)
+            // The model must still see every name, closed set and number bound at every level.
+            val search = tools.first { it.string("name") == "search_web" }
+            assertTrue(search.obj("parameters")!!.obj("properties")!!.obj("site")!!.array("enum")!!.size == 5)
+            val alarm = tools.first { it.string("name") == "set_alarm" }
+            assertEquals(23L, alarm.obj("parameters")!!.obj("properties")!!.obj("hour")!!.long("maximum"))
+        }
+        assertTrue(!minimal.contains("The app name as the user said it."))
+    }
+
+    @Test
+    fun theFullToolListStaysSmallEnoughToBeReasonable() {
+        // Needle 3 reads the whole list as part of its prompt; keep it modest. (about 5.5 KB at the time of writing)
+        assertTrue(reg.toNeedleToolsJson(both).length < 7_000)
+        assertTrue(reg.toNeedleToolsJson(phone).length < 5_000)
+    }
+
+    @Test
     fun signatureChangesWithToolSetAndIsStable() {
         assertEquals(reg.signature(phone), reg.signature(phone))
         assertNotEquals(reg.signature(phone), reg.signature(both))

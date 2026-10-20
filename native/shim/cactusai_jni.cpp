@@ -64,7 +64,8 @@ void set_error(const std::string& message) {
 
 #if CACTUSAI_ENGINE_LINKED
 const char* engine_last_error() { return needle_last_error(); }
-int engine_load(const void* p, uint64_t n) { return needle_load(p, n); }
+int engine_load(const void* p, uint64_t n) { return needle_load(static_cast<const unsigned char*>(p), n); }
+int engine_models() { return needle_models(); }
 int engine_init(const char* s, const char* t) { return needle_init(s, t, nullptr); }
 int engine_complete(const char* text, int max_new, char* out, int cap) {
     return needle_complete(text, nullptr, 0, max_new, out, cap);
@@ -78,6 +79,7 @@ constexpr bool kLinked = true;
 const char* kNotLinked = "This build does not contain the Needle engine library (see native-engine/README.md).";
 const char* engine_last_error() { return kNotLinked; }
 int engine_load(const void*, uint64_t) { return -1; }
+int engine_models() { return 0; }
 int engine_init(const char*, const char*) { return -1; }
 int engine_complete(const char*, int, char*, int) { return -1; }
 int engine_transcribe(const float*, int, const char*, const char*, char*, int) { return -1; }
@@ -236,6 +238,11 @@ JNIEXPORT jint JNICALL Java_app_cactusai_core_engine_NativeLib_nativeLoadModel(J
     g_mappings[path] = Mapping{data, size};
     g_last_error.clear();
     return 0;
+}
+
+JNIEXPORT jint JNICALL Java_app_cactusai_core_engine_NativeLib_nativeLoadedKinds(JNIEnv*, jclass) {
+    std::lock_guard<std::mutex> lock(g_mutex);
+    return engine_models();
 }
 
 JNIEXPORT jint JNICALL Java_app_cactusai_core_engine_NativeLib_nativeInit(JNIEnv* env, jclass, jstring jsystem, jstring jtools) {
