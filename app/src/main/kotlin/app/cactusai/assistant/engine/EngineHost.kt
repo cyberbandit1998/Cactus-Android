@@ -97,6 +97,16 @@ class EngineHost(
 
     val isLinked: Boolean get() = engine.isLinked
 
+    /** Null when the model's file is installed and structurally valid; otherwise a message for the user. */
+    fun missingModelMessage(kind: ModelKind): String? {
+        val spec = Models.of(kind)
+        return when (val status = store.status(spec)) {
+            is ModelStatus.Installed -> null
+            ModelStatus.NotInstalled, is ModelStatus.Partial -> "${spec.displayName} is not downloaded yet. Open the Models tab and download it."
+            is ModelStatus.Invalid -> "The ${spec.displayName} file is damaged (${status.reason}). Open the Models tab, delete it and download it again."
+        }
+    }
+
     suspend fun transcribe(samples: FloatArray, language: String?, keywords: String?): HostResult<TranscribeOutput> =
         withContext(dispatcher) {
             _state.value = _state.value.copy(engineLinked = engine.isLinked)
@@ -169,6 +179,11 @@ class EngineHost(
     /** Returns the load time in ms when this call loaded the model, null when it was already loaded. */
     private fun ensureLoaded(spec: ModelSpec): HostResult<Long?> {
         val bit = if (spec.kind == ModelKind.NEEDLE) KIND_TEXT else KIND_SPEECH
+        // The engine cannot unload a model, so a deleted file would otherwise keep working until restart.
+        // Honour the deletion: no file, no model.
+        if (!store.file(spec).isFile) {
+            return HostResult.Fail(FailureKind.MODEL_MISSING, "${spec.displayName} is not downloaded. Open the Models tab and download it.")
+        }
         // Trust the engine's own report (needle_models), not just our bookkeeping.
         if (runtime(spec).stage == LoadStage.LOADED && (engine.loadedKinds() and bit) != 0) return HostResult.Ok(null)
 

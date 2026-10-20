@@ -40,6 +40,7 @@ import app.cactusai.assistant.ui.screens.HistoryScreen
 import app.cactusai.assistant.ui.screens.HomeScreen
 import app.cactusai.assistant.ui.screens.ModelsScreen
 import app.cactusai.assistant.ui.screens.SettingsScreen
+import app.cactusai.core.engine.NativeLib
 import app.cactusai.core.models.ModelKind
 import app.cactusai.core.models.ModelStatus
 
@@ -128,6 +129,7 @@ fun AppRoot(container: AppContainer, startListening: Boolean) {
                     voiceEnabled = settings.voiceActivationEnabled,
                     modelsReady = modelsReady,
                     engineLinked = container.engine.isLinked,
+                    engineProblem = NativeLib.lastLoadError(),
                     thermalWarning = thermalWarning,
                     showRawJson = settings.expandRawJson,
                     onStartListening = controller::startListening,

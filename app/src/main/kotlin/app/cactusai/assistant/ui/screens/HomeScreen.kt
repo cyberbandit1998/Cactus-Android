@@ -41,6 +41,7 @@ fun HomeScreen(
     voiceEnabled: Boolean,
     modelsReady: Boolean,
     engineLinked: Boolean,
+    engineProblem: String?,
     thermalWarning: String?,
     showRawJson: Boolean,
     onStartListening: () -> Unit,
@@ -65,7 +66,8 @@ fun HomeScreen(
         if (!engineLinked) {
             SectionCard(title = "AI engine missing") {
                 Text(
-                    "This build of the app does not contain the Needle engine, so it cannot run the models. Build it again after running the engine fetch script (see the README).",
+                    "This build of the app does not contain the Needle engine, so it cannot run the models. Build it again after running the engine fetch script (see the README)." +
+                        (engineProblem?.let { " Details: $it" } ?: ""),
                     style = MaterialTheme.typography.bodyMedium,
                 )
             }

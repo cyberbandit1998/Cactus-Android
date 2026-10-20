@@ -61,6 +61,8 @@ class ToolRegistryTest {
             assertEquals(23L, alarm.obj("parameters")!!.obj("properties")!!.obj("hour")!!.long("maximum"))
         }
         assertTrue(!minimal.contains("The app name as the user said it."))
+        assertTrue("full keeps the routing regexes", full.contains("triggers") && compact.contains("triggers"))
+        assertTrue("the safest level has none", !minimal.contains("triggers"))
     }
 
     @Test

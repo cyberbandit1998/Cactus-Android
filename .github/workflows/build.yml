@@ -113,7 +113,11 @@ jobs:
             echo "-- first answer to the download URL (headers only)"
             curl -sI "https://huggingface.co/$repo/resolve/main/$file" | grep -iE '^(HTTP|location|x-linked-etag|x-linked-size|content-length)' || true
             echo "-- where the download is redirected to, and whether it accepts a byte range (1 byte requested)"
-            curl -sL -D - -o /dev/null -r 0-0 "https://huggingface.co/$repo/resolve/main/$file" | grep -iE '^(HTTP|location|content-range|accept-ranges)' || true
+            curl -sL -D - -o /dev/null -r 0-0 "https://huggingface.co/$repo/resolve/main/$file" | grep -iE '^(HTTP|location|content-range|accept-ranges)' | sed -E 's/(location: https:\/\/[^\/?]+).*/\1 ... (signed address omitted)/I' || true
+            echo "-- licence: first lines of the repository LICENSE file"
+            curl -fsSL "https://huggingface.co/$repo/resolve/main/LICENSE" | head -4 || true
+            echo "-- model card header (licence, tags)"
+            curl -fsSL "https://huggingface.co/$repo/resolve/main/README.md" | head -25 || true
           done
 
       - name: Lint summary
@@ -138,6 +142,20 @@ jobs:
           for r in sorted(rows):
               print(' | '.join(r))
           PY
+
+      - name: Inspect the APK (package, SDK levels, ABI, permissions, signature, checksum)
+        if: always() && runner.os == 'Linux'
+        shell: bash
+        run: |
+          BT="$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)"
+          echo "build-tools: $BT"
+          "$BT/aapt2" dump badging dist/CactusAI-debug.apk | grep -E "^(package:|sdkVersion|targetSdkVersion|native-code|uses-permission|application-label:|launchable-activity)" || true
+          echo "---- signature"
+          "$BT/apksigner" verify --verbose dist/CactusAI-debug.apk 2>&1 | head -8 || true
+          echo "---- native libraries inside the APK"
+          unzip -l dist/CactusAI-debug.apk | grep -E "lib/" || true
+          echo "---- sha256"
+          sha256sum dist/CactusAI-debug.apk
 
       - name: Show the APK
         shell: bash

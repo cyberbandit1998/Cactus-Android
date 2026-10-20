@@ -18,6 +18,7 @@ import app.cactusai.core.history.InputSource
 import app.cactusai.core.history.Outcome
 import app.cactusai.core.json.Json
 import app.cactusai.core.metrics.Timings
+import app.cactusai.core.models.ModelKind
 import app.cactusai.core.needle.NeedleResponse
 import app.cactusai.core.plan.Hint
 import app.cactusai.core.plan.PlanOutcome
@@ -88,6 +89,16 @@ class AssistantController(
             _state.value = AssistantUiState(permission = PermissionNeed.MICROPHONE, status = "Allow the microphone to talk to me.")
             return
         }
+        // Do not make the user speak into a microphone only to say afterwards that the engine or a model is missing.
+        val missing = if (!engine.isLinked) {
+            "This build of the app has no AI engine inside, so it cannot hear or understand commands. Rebuild it with the engine (see the README)."
+        } else {
+            engine.missingModelMessage(ModelKind.WHISTLE) ?: engine.missingModelMessage(ModelKind.NEEDLE)
+        }
+        if (missing != null) {
+            _state.value = AssistantUiState(phase = Phase.DONE, response = missing, outcome = Outcome.FAILED)
+            return
+        }
         recorder.prepare()
         job = scope.launch { runVoice() }
     }
@@ -101,6 +112,10 @@ class AssistantController(
         val trimmed = text.trim()
         if (trimmed.isEmpty() || isBusy) return
         lastTypedText = trimmed
+        engine.missingModelMessage(ModelKind.NEEDLE)?.let {
+            _state.value = AssistantUiState(phase = Phase.DONE, source = InputSource.TEXT, recognizedText = trimmed, response = it, outcome = Outcome.FAILED)
+            return
+        }
         job = scope.launch { runCommand(trimmed, InputSource.TEXT, Timings(), System.nanoTime()) }
     }
 

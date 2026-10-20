@@ -44,3 +44,22 @@
 ## Getting diagnostics
 
 `adb logcat -s CactusAI CactusTest` and the Settings tab's "Debugging" lines (version, shim version, engine linked).
+
+## Independent check with the vendor's own command-line tool (optional, untested here)
+
+`scripts\fetch-engine.ps1` also downloads Cactus Compute's own `needle` program for Android
+(`native-engine\android-arm64\needle`). If you suspect the problem is the model or the phone rather than this app, you
+can run the vendor's tool directly. The usage comes from the upstream README (`needle --model needle3.cact --tools
+tools.json ...`); **it has not been tried by the author of this project**, so treat it as a starting point:
+
+```powershell
+# on the PC: get the weights once (about 35 MB)
+curl.exe -L -o needle3.cact https://huggingface.co/Cactus-Compute/needle3/resolve/main/needle3.cact
+adb push native-engine\android-arm64\needle /data/local/tmp/needle
+adb push needle3.cact /data/local/tmp/needle3.cact
+adb shell chmod +x /data/local/tmp/needle
+adb shell "/data/local/tmp/needle --help"
+```
+
+Note that this tool reports usage statistics unless `NEEDLE_TELEMETRY=0` and `DO_NOT_TRACK=1` are set in its environment
+(`adb shell "NEEDLE_TELEMETRY=0 DO_NOT_TRACK=1 /data/local/tmp/needle ..."`). It is not part of the APK.

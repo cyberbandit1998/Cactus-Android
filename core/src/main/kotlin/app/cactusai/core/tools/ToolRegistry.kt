@@ -123,7 +123,8 @@ class ToolRegistry(val tools: List<ToolSpec>) {
         schema["name"] = tool.name
         schema["description"] = if (detail == ToolDetail.MINIMAL) firstSentence(tool.description) else tool.description
         schema["parameters"] = parameters
-        if (tool.triggers.isNotEmpty()) schema["triggers"] = tool.triggers
+        // The shortest level is also the safest one: no routing regexes, in case the engine dislikes their syntax.
+        if (tool.triggers.isNotEmpty() && detail != ToolDetail.MINIMAL) schema["triggers"] = tool.triggers
         return jsonOf(schema) as JsonValue.Obj
     }
 
