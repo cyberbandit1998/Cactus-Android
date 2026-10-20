@@ -12,7 +12,9 @@ class HistoryRepository(private val store: HistoryStore) {
     val entries: StateFlow<List<HistoryEntry>> = _entries.asStateFlow()
 
     fun add(entry: HistoryEntry) {
-        _entries.value = store.add(entry)
+        // List keys must be unique, so a clash (two commands finishing in the same millisecond) is nudged apart.
+        val id = maxOf(entry.id, (_entries.value.maxOfOrNull { it.id } ?: 0L) + 1)
+        _entries.value = store.add(entry.copy(id = id))
     }
 
     fun clear() {

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Lets Cactus AI be chosen under Settings > Apps > Default apps > Digital assistant app.
+  Class names are fully qualified on purpose: the system resolves them without our manifest's package.
+  No hotword/wake-word support is declared: this assistant is opened by the system's assistant gesture
+  (for example press-and-hold on the power button, if the phone is set up that way) and by push-to-talk.
+-->
+<voice-interaction-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:recognitionService="app.cactusai.assistant.assistant.CactusRecognitionService"
+    android:sessionService="app.cactusai.assistant.assistant.CactusVoiceInteractionSessionService"
+    android:settingsActivity="app.cactusai.assistant.MainActivity"
+    android:supportsAssist="true"
+    android:supportsLaunchVoiceAssistFromKeyguard="false" />

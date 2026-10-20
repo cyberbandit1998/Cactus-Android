@@ -47,6 +47,53 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- Older-style "assist" launch: lets the system start the app as the assistant. -->
+            <intent-filter>
+                <action android:name="android.intent.action.ASSIST" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
         </activity>
+
+        <!-- Optional screen control. Disabled until the user enables it in Android's Accessibility settings. -->
+        <service
+            android:name=".a11y.CactusAccessibilityService"
+            android:exported="true"
+            android:label="@string/accessibility_service_label"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/accessibility_service_config" />
+        </service>
+
+        <!-- Digital assistant integration. Selectable under Default apps > Digital assistant app. -->
+        <service
+            android:name=".assistant.CactusVoiceInteractionService"
+            android:exported="true"
+            android:label="@string/assistant_service_label"
+            android:permission="android.permission.BIND_VOICE_INTERACTION">
+            <meta-data
+                android:name="android.voice_interaction"
+                android:resource="@xml/voice_interaction_service" />
+            <intent-filter>
+                <action android:name="android.service.voice.VoiceInteractionService" />
+            </intent-filter>
+        </service>
+        <service
+            android:name=".assistant.CactusVoiceInteractionSessionService"
+            android:exported="true"
+            android:permission="android.permission.BIND_VOICE_INTERACTION" />
+        <!-- Android requires a recognition service next to a voice interaction service. It is a placeholder
+             that reports "not supported"; Cactus AI does its own speech recognition inside its session. -->
+        <service
+            android:name=".assistant.CactusRecognitionService"
+            android:exported="true"
+            android:label="@string/assistant_service_label">
+            <intent-filter>
+                <action android:name="android.speech.RecognitionService" />
+            </intent-filter>
+        </service>
     </application>
 </manifest>

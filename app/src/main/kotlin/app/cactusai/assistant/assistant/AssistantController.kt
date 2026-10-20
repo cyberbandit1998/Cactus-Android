@@ -139,6 +139,15 @@ class AssistantController(
         if (_state.value.permission == PermissionNeed.CONTACTS && typed != null) submitText(typed) else _state.update { it.copy(permission = null) }
     }
 
+    /** The user said no in Android's permission dialog: explain what that means instead of failing silently. */
+    fun permissionDenied(need: PermissionNeed) {
+        val message = when (need) {
+            PermissionNeed.MICROPHONE -> "Without the microphone I cannot hear you. You can still type commands, or allow it later in Android settings > Apps > Cactus AI > Permissions."
+            PermissionNeed.CONTACTS -> "Without contacts I cannot look people up by name. You can dial a number instead, or allow it later in Android settings > Apps > Cactus AI > Permissions."
+        }
+        _state.value = AssistantUiState(phase = Phase.DONE, response = message, outcome = Outcome.REFUSED)
+    }
+
     fun onResultClicked(item: ResultItem) {
         val problem = executor.perform(item.action)
         if (problem != null) _state.update { it.copy(action = problem) }

@@ -1,20 +1,23 @@
 package app.cactusai.assistant
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.material3.darkColorScheme
-import app.cactusai.core.engine.NativeEngine
+import androidx.activity.enableEdgeToEdge
+import app.cactusai.assistant.ui.AppRoot
+import app.cactusai.assistant.ui.theme.CactusTheme
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
+        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
-        val linked = NativeEngine().isLinked
+        val container = (application as CactusApp).container
+        // Opened through the system's "assist" action (assistant gesture): start listening, but only a fresh launch.
+        val asAssistant = savedInstanceState == null && intent?.action == Intent.ACTION_ASSIST
         setContent {
-            MaterialTheme(colorScheme = darkColorScheme()) {
-                Text("Cactus AI skeleton. Engine linked: $linked")
+            CactusTheme {
+                AppRoot(container = container, startListening = asAssistant)
             }
         }
     }
