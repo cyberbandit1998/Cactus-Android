@@ -69,7 +69,7 @@ Legend: **built** = code exists and compiles in CI; **JVM-tested** = also covere
 | --- | --- |
 | Android Studio project, Gradle wrapper, version catalog | built |
 | Windows scripts: environment check, engine fetch, debug build to `dist\CactusAI-debug.apk`, signed release build | CI ran the fetch script and the Gradle build on Windows; the `.ps1` wrapper scripts for build/check were **not** run |
-| GitHub Actions: tests, APK on Linux + Windows, unsigned release, device-test compile, lint, engine/APK inspection | running |
+| GitHub Actions: tests, APK on Linux + Windows, unsigned release, device-test compile, lint, engine/APK inspection | green on both runners (see VERIFIED_CONTRACT.md 2.4) |
 
 ## 2. Test inventory
 
@@ -96,8 +96,10 @@ test double that only echoes), that Android behaves as the intents expect, or an
 * **Cancelling inference:** a model call already running cannot be interrupted; its result is discarded.
 * **Release APK size / minimising:** debug APK is about 25 MB (mostly debug Compose dex). The release build uses R8;
   its size was not recorded here.
-* **APK in `dist/`:** not committed. It contains the vendor engine statically linked, whose redistribution terms are
-  unknown (see NOTICE.md). Build it with `scripts\build-debug.ps1` or download the CI artifact.
+* **APK in `dist/`:** the Windows-built CI APK is committed there by the workflow's manual `commit_apk` option (see
+  `dist/BUILD-INFO.txt` for the source commit and SHA-256). It is debug-signed with a throwaway CI key and has never been run
+  on a phone. It contains the vendor engine statically linked, which the engine's repository declares Apache-2.0 (NOTICE.md).
+  To build your own: `scripts\build-debug.ps1`; the CI artifact `CactusAI-debug-apk-Windows` is the same build.
 * **Targets:** `targetSdk 35`, `minSdk 29`, arm64-v8a only. Lint notes newer SDKs/libraries exist; the pinned
   versions are the ones CI built.
 * **Wi-Fi/mobile data toggling in the offline test** uses `svc` shell commands through UiAutomator; it is opt-in.
@@ -109,4 +111,4 @@ test double that only echoes), that Android behaves as the intents expect, or an
 3. Walk `DEVICE_TEST_CHECKLIST.md` and fill in the blanks; run `connectedDebugAndroidTest`.
 4. If Needle's accuracy with 17 tools is weak, trim `AssistantTools.kt` toward the vendor's guidance of about five
    tools per context, or enable fewer groups.
-5. Decide on a licence for the project's own code and check the Hugging Face model cards before sharing an APK.
+5. Decide on a licence for the project's own code (the engine and models are Apache-2.0 as declared by their repositories; see NOTICE.md).

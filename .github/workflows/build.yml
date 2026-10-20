@@ -7,8 +7,16 @@ name: build
 
 on:
   push:
+    # Committing the finished APK to dist/ must not start another build.
+    paths-ignore:
+      - 'dist/**'
   pull_request:
   workflow_dispatch:
+    inputs:
+      commit_apk:
+        description: 'After a green build, commit the Windows-built debug APK to dist/ on this branch'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -149,7 +157,7 @@ jobs:
         run: |
           BT="$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)"
           echo "build-tools: $BT"
-          "$BT/aapt2" dump badging dist/CactusAI-debug.apk | grep -E "^(package:|sdkVersion|targetSdkVersion|native-code|uses-permission|application-label:|launchable-activity)" || true
+          "$BT/aapt2" dump badging dist/CactusAI-debug.apk | grep -E "^(package:|sdkVersion|minSdkVersion|targetSdkVersion|native-code|uses-permission|application-label:|launchable-activity)" || true
           echo "---- signature"
           "$BT/apksigner" verify --verbose dist/CactusAI-debug.apk 2>&1 | head -8 || true
           echo "---- native libraries inside the APK"
@@ -176,3 +184,48 @@ jobs:
             app/build/reports/lint-results-debug.html
             app/build/reports/tests
           retention-days: 7
+
+  # Manual only (Run workflow -> tick "commit_apk"). The APK is built on the Windows runner by the job above and
+  # committed unchanged, so that dist/CactusAI-debug.apk exists in the repository for `adb install -r`.
+  commit-apk:
+    name: commit the Windows-built APK to dist/
+    if: github.event_name == 'workflow_dispatch' && inputs.commit_apk
+    needs: [core, android]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: CactusAI-debug-apk-Windows
+          path: dist
+      - name: Commit dist/CactusAI-debug.apk and dist/BUILD-INFO.txt
+        env:
+          BRANCH: ${{ github.ref_name }}
+          SOURCE_SHA: ${{ github.sha }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          sum="$(sha256sum dist/CactusAI-debug.apk | cut -d' ' -f1)"
+          size="$(stat -c %s dist/CactusAI-debug.apk)"
+          {
+            echo "CactusAI-debug.apk"
+            echo "  built by:    GitHub Actions, windows-latest runner (Gradle :app:assembleDebug)"
+            echo "  run:         $RUN_URL"
+            echo "  source:      commit $SOURCE_SHA"
+            echo "  built at:    $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "  size:        $size bytes"
+            echo "  sha256:      $sum"
+            echo "  signed with: the runner's throwaway Android debug key (not a release key)"
+            echo "  contains:    the Needle engine (Apache-2.0 as declared by its Hugging Face repository), arm64-v8a only"
+            echo "  tested on:   no phone. It was compiled and inspected only; see docs/DEVICE_TEST_CHECKLIST.md"
+          } > dist/BUILD-INFO.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f dist/CactusAI-debug.apk dist/BUILD-INFO.txt
+          git commit -m "Add the Windows-built debug APK (dist/CactusAI-debug.apk)" \
+            -m "Built by CI from commit $SOURCE_SHA, see dist/BUILD-INFO.txt. Not tested on a phone." \
+            -m "Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>" \
+            -m "Claude-Session: https://claude.ai/code/session_01PjWzmT2SfxsVsHpWiimmrG"
+          git push origin "HEAD:$BRANCH"

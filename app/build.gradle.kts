@@ -83,6 +83,9 @@ android {
         jniLibs { useLegacyPackaging = false }
     }
 
+    // The Apache-2.0 text travels inside the APK (the engine is linked into it); Settings -> Licences shows it.
+    sourceSets.getByName("main").assets.srcDir(rootProject.file("LICENSES"))
+
     testOptions { unitTests.isReturnDefaultValues = true }
 
     lint {

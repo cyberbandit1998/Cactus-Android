@@ -19,6 +19,6 @@ native-engine/*
 !native-engine/README.md
 !native-engine/.gitkeep
 
-# Build outputs are produced locally or by CI; see dist/README.md
+# Local build outputs stay out of git; CI force-adds the finished APK, see dist/README.md
 dist/*
 !dist/README.md

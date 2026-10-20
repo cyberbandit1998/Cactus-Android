@@ -22,6 +22,8 @@ files**. So:
 | The C API Cactus Compute ships for Android matches what the app calls (`needle_load`, `needle_init`, `needle_complete`, `needle_transcribe`, `needle_reset`, `needle_models`) | CI printed the vendor's real `needle.h` and the symbols of `libneedle.a`; see [docs/VERIFIED_CONTRACT.md](docs/VERIFIED_CONTRACT.md) |
 | The whole project **builds** on GitHub's Linux **and Windows** runners, links the real engine, and produces an arm64 debug APK (`lib/arm64-v8a/libcactusai_native.so` inside) | GitHub Actions, workflow `build` |
 | An unsigned release build (R8 shrinking) and the on-device test sources **compile** | Same workflow |
+| What the finished debug APK contains: package `app.cactusai.assistant`, target API 35, **arm64-v8a only**, signed (v2 scheme), exactly these permissions: internet, network state, microphone, contacts, alarm (plus one AndroidX-internal signature permission) | `aapt2 dump badging` and `apksigner verify` printed by the CI run |
+| The models' hosting: sizes, SHA-256 from the listing, redirects, resumable downloads, and **Apache-2.0** licence files and model-card headers for both repositories | Metadata-only CI step (no model file is downloaded) |
 | 120+ unit tests of the safety rules, parsers, planner, matcher, `.cact` checks, downloader (against a real local HTTP server: resume, corruption, redirects), step runner, history | `./gradlew :core:test`, run in CI and locally |
 | The JNI glue handles UTF-8/emoji, float arrays, errors, concurrency, and sets the telemetry opt-out | 14 JVM tests against a **test double** of the engine's C ABI (not the real engine) |
 
@@ -67,6 +69,11 @@ choose the `app` configuration and press Run with the phone selected.
 
 No Windows machine handy? Every push builds a debug APK in GitHub Actions: open the repository's **Actions** tab,
 the latest `build` run, and download the artifact `CactusAI-debug-apk-Windows` (or `-Linux`).
+
+If `dist/CactusAI-debug.apk` is present in the repository, it was built by that workflow on the Windows runner and
+committed unchanged by its manual `commit_apk` option; `dist/BUILD-INFO.txt` gives the source commit and SHA-256. It is a
+**debug-signed, never-run-on-a-phone** build. Its signing key is a throwaway on the CI runner, so an APK built on your own PC
+has a different signature and cannot be installed over it without uninstalling first.
 
 ### If the build fails
 
@@ -154,9 +161,12 @@ docs/            ARCHITECTURE, VERIFIED_CONTRACT, DEVICE_TEST_CHECKLIST, ASSISTA
 
 ## Licences and credits
 
-* Cactus Compute's **Needle** and **Whistle** (engine and weights) are third-party. The Needle repository is
-  Apache-2.0; the licence of the prebuilt engine binary and the model weights was **not verifiable from the build
-  environment** (the model pages were unreachable). Read the Hugging Face model cards before sharing an APK.
+* Cactus Compute's **Needle** and **Whistle** (engine and weights) are third-party. Their Hugging Face repositories
+  (`Cactus-Compute/needle3`, which also holds the engine, and `Cactus-Compute/whistle`) each carry a `LICENSE` file that
+  begins "Apache License, Version 2.0" and a model card that says `license: apache-2.0` (read by CI; only the first
+  lines of the file were read). The Apache text is in `LICENSES/Apache-2.0.txt`, packaged in the APK and shown under
+  Settings → Licences. Whether the closed engine binary has extra terms of its own is not something this project
+  could check; see [NOTICE.md](NOTICE.md).
   The separate `cactus` engine repository uses a custom licence (free for personal/non-commercial use) and is
   **not used** here: its open-source engine does not support Needle 3 or Whistle.
 * Android Jetpack/Compose, Kotlin and kotlinx.coroutines: Apache-2.0.

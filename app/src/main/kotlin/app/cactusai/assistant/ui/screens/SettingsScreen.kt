@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -33,6 +34,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
@@ -62,6 +64,7 @@ fun SettingsScreen(
 
     var confirmDeleteHistory by remember { mutableStateOf(false) }
     var confirmDeleteModels by remember { mutableStateOf(false) }
+    var showLicence by remember { mutableStateOf(false) }
 
     val folderPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         if (uri != null) {
@@ -192,6 +195,15 @@ fun SettingsScreen(
             }
         }
 
+        SectionCard(title = "Licences") {
+            Text(
+                "The Needle engine and the Needle 3 and Whistle models are published by Cactus Compute under the Apache License 2.0, as declared in their Hugging Face repositories. " +
+                    "The engine is built into this app. Android Jetpack, Compose, Kotlin and kotlinx.coroutines are Apache-2.0 as well.",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            OutlinedButton(onClick = { showLicence = true }) { Text("Show the Apache-2.0 text") }
+        }
+
         SectionCard(title = "Debugging") {
             SwitchRow("Show raw JSON expanded", "Opens the model's raw answer by default in the details section.", settings.expandRawJson) { on ->
                 container.settings.update { it.copy(expandRawJson = on) }
@@ -201,6 +213,28 @@ fun SettingsScreen(
         }
     }
 
+    if (showLicence) {
+        val text = remember {
+            try {
+                context.assets.open("Apache-2.0.txt").use { it.readBytes().toString(Charsets.UTF_8) }
+            } catch (_: java.io.IOException) {
+                "The licence text is missing from this build. It is in LICENSES/Apache-2.0.txt in the source repository."
+            }
+        }
+        AlertDialog(
+            onDismissRequest = { showLicence = false },
+            title = { Text("Apache License 2.0") },
+            text = {
+                Text(
+                    text,
+                    style = MaterialTheme.typography.bodySmall,
+                    fontFamily = FontFamily.Monospace,
+                    modifier = Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState()),
+                )
+            },
+            confirmButton = { TextButton(onClick = { showLicence = false }) { Text("Close") } },
+        )
+    }
     if (confirmDeleteHistory) {
         AlertDialog(
             onDismissRequest = { confirmDeleteHistory = false },

@@ -10,7 +10,8 @@ from. Dates are 2026-10-20 unless noted.
 | `github.com/cactus-compute/needle` (README, `llms.txt`, Python package `needle/`, tests) | Cloned (shallow) | commit `b4fc11b`, "Pin engine 3.3.3", 2026-10-19 |
 | `github.com/cactus-compute/cactus` (README, `android/`, `bindings/kotlin/`, `cactus-engine/`, LICENSE) | Cloned (shallow) | commit `2cfcdb8`, v2.2.2, 2026-09-26 |
 | `Cactus-Compute/needle3` on Hugging Face, folder `android-arm64/` | Downloaded by the fetch script on GitHub's runners; header printed and library inspected by CI | repo commit `d6c7d6a2e9655505e0f8e23339356dd1705900eb` |
-| `cactuscompute.com`, `docs.cactuscompute.com`, `huggingface.co` pages (model cards) | **Not reachable** from the build environment (blocked by its network policy). Their content is not used as evidence anywhere. | - |
+| `cactuscompute.com`, `docs.cactuscompute.com`, `huggingface.co` web pages | **Not reachable** from the sandbox this project was written in (blocked by its network policy). Their content is not used as evidence anywhere. | - |
+| Hugging Face repository listings, `LICENSE` and `README.md` (model-card) headers of `Cactus-Compute/needle3` and `Cactus-Compute/whistle` | Read by a CI step on GitHub's runners (metadata and the first lines only) | snapshot of 2026-10-20 |
 | `developer.android.com` | Reachable, but Android API use relies on the compile and lint results below | - |
 
 ## 2. Findings
@@ -73,7 +74,8 @@ memory/string (`memcpy memmove memset memcmp strlen strstr strtod atoi atof ...`
 | The project builds on **Windows** and Linux; NDK 27.0.12077973, CMake 3.22.1, AGP 8.7.3, Gradle 8.10.2, JDK 17 | Both `debug APK` jobs green |
 | The APK contains `lib/arm64-v8a/libcactusai_native.so` (about 2 MB, engine linked in) | `unzip -l` in the log |
 | An unsigned release build with R8, and the instrumented-test sources, compile | Same job (`assembleRelease`, `assembleDebugAndroidTest`) |
-| Lint: 0 errors | Lint summary step |
+| Lint: 0 errors | Lint summary step (39 warnings, all version-update or housekeeping hints) |
+| The debug APK: package `app.cactusai.assistant` 0.1.0, `targetSdkVersion` 35, `native-code: arm64-v8a`, signed with the v2 scheme (`apksigner verify` says "Verifies"), requests only `INTERNET`, `ACCESS_NETWORK_STATE`, `RECORD_AUDIO`, `READ_CONTACTS`, `com.android.alarm.permission.SET_ALARM` and AndroidX's `...DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION` (a signature permission it adds itself); native libraries inside: `libcactusai_native.so` (about 2.0 MB) and `libandroidx.graphics.path.so` | `aapt2 dump badging`, `apksigner verify`, `unzip -l` in the CI log (Linux job, run of commit `5900c97`) |
 | 121 `:core` JVM tests pass (including the JNI glue against a test double) | `core tests (Linux)` job and local runs |
 
 ### 2.5 Licences
@@ -82,7 +84,7 @@ memory/string (`memcpy memmove memset memcmp strlen strstr strtod atoi atof ...`
 | --- | --- |
 | `cactus-compute/needle` repository | Apache-2.0 (`LICENSE`, `pyproject.toml`) |
 | `cactus-compute/cactus` repository | Custom licence: free for individuals / education / non-profits / organisations under USD 2M funding and revenue; commercial licence otherwise. **Not used.** |
-| Prebuilt engine (`libneedle.a`, `needle.h`) and the `.cact` weights | See section 5 / `NOTICE.md`: the model repositories each contain an 11,358-byte `LICENSE` file (the same size as the Apache-2.0 text); its content is printed by CI and recorded in `NOTICE.md` when read. |
+| Prebuilt engine (`libneedle.a`, `needle.h`) and the `.cact` weights | **Apache-2.0 as declared by their repositories.** CI printed it: both `Cactus-Compute/needle3` (which contains the engine in `android-arm64/`) and `Cactus-Compute/whistle` have an 11,358-byte `LICENSE` that begins "Apache License, Version 2.0, January 2004" (the same size as the upstream `needle` repository's Apache-2.0 `LICENSE`), and model-card headers with `license: apache-2.0`. Only the first lines of each file were read. Not checked: extra terms inside the closed binary, a separate `NOTICE`, the training-data licences. Details and consequences: `NOTICE.md`. |
 
 ## 3. Facts about the models taken from upstream documentation (not tested here)
 
@@ -116,6 +118,6 @@ The hosts and sizes above are a snapshot from 2026-10-20; the app reads the real
 * That the 17-tool list fits Needle's context window (unknown window size; fallbacks exist).
 * Microphone capture on the phone, the assistant gesture, accessibility behaviour, every Android intent on a real
   phone, the `.ps1` convenience scripts other than `fetch-engine.ps1`.
-* The licence of the engine and weights.
+* Anything beyond what the repositories' `LICENSE` files and model cards declare about the engine and weights (see 2.5).
 * That the engine's file I/O is harmless (see 2.3).
 
