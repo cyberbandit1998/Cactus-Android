@@ -1,0 +1,10 @@
+CactusAI-debug.apk
+  built by:    GitHub Actions, windows-latest runner (Gradle :app:assembleDebug)
+  run:         https://github.com/cyberbandit1998/Cactus-Android/actions/runs/39471386059
+  source:      commit 3fd9431622dc07a8bbf611334eeb5ab98281c525
+  built at:    2026-10-20T18:06:23Z
+  size:        25370561 bytes
+  sha256:      93536980f7eb26f9198673dc2965f056ea546e6e98186143e89bbc39a7d17862
+  signed with: the runner's throwaway Android debug key (not a release key)
+  contains:    the Needle engine (Apache-2.0 as declared by its Hugging Face repository), arm64-v8a only
+  tested on:   no phone. It was compiled and inspected only; see docs/DEVICE_TEST_CHECKLIST.md
