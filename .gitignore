@@ -1,0 +1,24 @@
+# Gradle / IDE
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+local.properties
+.idea/
+*.iml
+.DS_Store
+captures/
+.cxx/
+
+# Signing material: never commit
+*.jks
+*.keystore
+keystore.properties
+
+# Third-party engine files fetched by scripts/fetch-engine.* (licence not ours to redistribute)
+native-engine/*
+!native-engine/README.md
+!native-engine/.gitkeep
+
+# Build outputs are produced locally or by CI; see dist/README.md
+dist/*
+!dist/README.md
