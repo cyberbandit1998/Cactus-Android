@@ -162,6 +162,8 @@ jobs:
           "$BT/apksigner" verify --verbose dist/CactusAI-debug.apk 2>&1 | head -8 || true
           echo "---- native libraries inside the APK"
           unzip -l dist/CactusAI-debug.apk | grep -E "lib/" || true
+          echo "---- licence text packaged as an asset (the build fails if it is missing)"
+          unzip -l dist/CactusAI-debug.apk | grep -E "assets/Apache-2.0.txt"
           echo "---- sha256"
           sha256sum dist/CactusAI-debug.apk
 
@@ -207,6 +209,8 @@ jobs:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           set -euo pipefail
+          unzip -l dist/CactusAI-debug.apk | grep -q "assets/Apache-2.0.txt"
+          unzip -l dist/CactusAI-debug.apk | grep -q "lib/arm64-v8a/libcactusai_native.so"
           sum="$(sha256sum dist/CactusAI-debug.apk | cut -d' ' -f1)"
           size="$(stat -c %s dist/CactusAI-debug.apk)"
           {
