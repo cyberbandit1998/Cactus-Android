@@ -7,6 +7,8 @@ import app.cactusai.core.history.InputSource
 import app.cactusai.core.history.Outcome
 import app.cactusai.core.metrics.Timings
 import app.cactusai.core.steps.Choice
+import app.cactusai.core.steps.ResultAction
+import app.cactusai.core.steps.ResultItem
 import app.cactusai.core.steps.RunResult
 import app.cactusai.core.steps.StepEvent
 import app.cactusai.core.steps.StepOutcome
@@ -72,11 +74,36 @@ class StepsAndHistoryTest {
 
     @Test
     fun needsChoiceAndPermissionAlsoStop() = runTest {
-        val choice = StepOutcome.NeedsChoice("Which camera?", listOf(Choice("a", "Camera"), Choice("b", "Camera")), openMaps)
+        val choice = StepOutcome.NeedsChoice("Which camera?", listOf(Choice("a", "Camera"), Choice("b", "Camera"))) { StepOutcome.Success("opened ${it.id}") }
         val r1 = StepRunner({ choice }).run(listOf(openMaps, scroll)) as RunResult.Stopped
         assertTrue(r1.outcome is StepOutcome.NeedsChoice)
+        assertEquals(0, r1.stoppedAt)
+        assertEquals("opened b", ((r1.outcome as StepOutcome.NeedsChoice).resolve(Choice("b", "Camera")) as StepOutcome.Success).message)
         val r2 = StepRunner({ StepOutcome.NeedsPermission("Contacts permission needed", "READ_CONTACTS") }).run(listOf(openMaps)) as RunResult.Stopped
         assertTrue(r2.outcome is StepOutcome.NeedsPermission)
+    }
+
+    @Test
+    fun approvalStopsTheRunAndCanBeResumedFromTheStoppedIndex() = runTest {
+        val seen = mutableListOf<String>()
+        val runner = StepRunner({ c ->
+            seen += c.name
+            if (c.name == "scroll") StepOutcome.NeedsApproval("Tap Pay now?") { StepOutcome.Success("tapped") } else StepOutcome.Success("ok")
+        }, StepPolicy(settleMs = 1))
+        val steps = listOf(battery, scroll, openMaps)
+        val stopped = runner.run(steps) as RunResult.Stopped
+        assertEquals(1, stopped.stoppedAt)
+        assertEquals(listOf("check_battery", "scroll"), seen)
+        assertEquals("tapped", ((stopped.outcome as StepOutcome.NeedsApproval).proceed() as StepOutcome.Success).message)
+        val rest = runner.run(steps.drop(stopped.stoppedAt + 1)) as RunResult.Completed
+        assertEquals(listOf("ok"), rest.messages)
+    }
+
+    @Test
+    fun successCarriesResultRows() = runTest {
+        val rows = listOf(ResultItem("Spotify", "com.spotify.music", ResultAction.LaunchPackage("com.spotify.music")))
+        val r = StepRunner({ StepOutcome.Success("Here are your apps", rows) }).run(listOf(battery)) as RunResult.Completed
+        assertEquals(rows, r.results)
     }
 
     @Test

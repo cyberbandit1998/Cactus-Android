@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Cactus AI</string>
+    <string name="accessibility_service_label">Cactus AI screen control</string>
+    <string name="accessibility_service_description">Optional. Lets Cactus AI scroll, go back, tap buttons you name and type text you dictate, only when you ask. It looks at the screen only to find what you named, keeps nothing, and never types into password or payment fields. Turn it off here at any time.</string>
+    <string name="assistant_service_label">Cactus AI</string>
 </resources>

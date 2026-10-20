@@ -77,6 +77,19 @@ jobs:
         shell: bash
         run: ./gradlew :app:assembleDebug :app:lintDebug :app:testDebugUnitTest --stacktrace
 
+      - name: Inspect the engine (compare its real header and symbols with native/shim/needle_abi.h)
+        if: always() && runner.os == 'Linux'
+        shell: bash
+        run: |
+          cat native-engine/android-arm64/ENGINE_SOURCE.txt || true
+          NM="$(ls "$ANDROID_HOME"/ndk/*/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-nm 2>/dev/null | tail -1)"
+          echo "==== needle.h (the vendor header)"
+          cat native-engine/android-arm64/needle.h || true
+          echo "==== functions defined by libneedle.a"
+          "$NM" -g --defined-only native-engine/android-arm64/libneedle.a 2>/dev/null | grep -E ' [TtWw] ' | sort -u | head -120 || true
+          echo "==== symbols libneedle.a expects from the system or the C++ runtime"
+          "$NM" -g -u native-engine/android-arm64/libneedle.a 2>/dev/null | sort -u | head -120 || true
+
       - name: Show the APK
         shell: bash
         run: |
