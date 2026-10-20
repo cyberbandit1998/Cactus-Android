@@ -90,7 +90,8 @@
         <service
             android:name=".assistant.CactusRecognitionService"
             android:exported="true"
-            android:label="@string/assistant_service_label">
+            android:label="@string/assistant_service_label"
+            tools:ignore="ExportedService">
             <intent-filter>
                 <action android:name="android.speech.RecognitionService" />
             </intent-filter>

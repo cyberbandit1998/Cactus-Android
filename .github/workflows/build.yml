@@ -88,11 +88,33 @@ jobs:
           echo "==== C-level functions libneedle.a expects from the system (no C++ names)"
           "$NM" -g -u "$LIB" 2>/dev/null | grep -v ' _Z' | awk '{print $2}' | sort -u | tr '\n' ' ' || true
           echo
-          echo "==== networking / process / dynamic-loading symbols in libneedle.a (empty result = none found)"
-          "$NM" -g -u "$LIB" 2>/dev/null | grep -Ei 'socket|connect|getaddrinfo|gethostby|curl|ssl|tls|sendto|sendmsg|recvfrom|recvmsg|dlopen|popen|system|exec|fork|http' || echo "none found"
+          echo "==== networking / process / dynamic-loading functions imported by libneedle.a (C names only; 'none found' = none)"
+          "$NM" -g -u "$LIB" 2>/dev/null | grep -v ' _Z' | awk '{print $2}' | grep -Ex '(socket|connect|bind|listen|accept|send|sendto|sendmsg|recv|recvfrom|recvmsg|getaddrinfo|gethostbyname|getifaddrs|res_.*|dlopen|dlsym|popen|system|execv.*|execl.*|fork|vfork|posix_spawn.*|syscall|curl_.*|SSL_.*)' || echo "none found"
           echo "==== URLs embedded in libneedle.a (empty result = none found)"
           strings -a "$LIB" | grep -Eio 'https?://[^ "]{4,80}' | sort -u | head -30 || true
           echo "(end)"
+
+      - name: Check the model hosting (metadata only, nothing large is downloaded)
+        if: always() && runner.os == 'Linux'
+        shell: bash
+        run: |
+          for pair in "Cactus-Compute/needle3 needle3.cact" "Cactus-Compute/whistle whistle.cact"; do
+            set -- $pair
+            repo=$1
+            file=$2
+            echo "==== $repo / $file"
+            echo "-- repository listing (what the app reads to get size and SHA-256)"
+            curl -fsSL "https://huggingface.co/api/models/$repo/tree/main" | python3 -c '
+          import json, sys
+          for e in json.load(sys.stdin):
+              lfs = e.get("lfs") or {}
+              print(e.get("type"), e.get("path"), "size", e.get("size"), "lfs.size", lfs.get("size"), "lfs.oid", (lfs.get("oid") or "")[:16])
+          '
+            echo "-- first answer to the download URL (headers only)"
+            curl -sI "https://huggingface.co/$repo/resolve/main/$file" | grep -iE '^(HTTP|location|x-linked-etag|x-linked-size|content-length)' || true
+            echo "-- where the download is redirected to, and whether it accepts a byte range (1 byte requested)"
+            curl -sL -D - -o /dev/null -r 0-0 "https://huggingface.co/$repo/resolve/main/$file" | grep -iE '^(HTTP|location|content-range|accept-ranges)' || true
+          done
 
       - name: Lint summary
         if: always() && runner.os == 'Linux'

@@ -45,7 +45,7 @@ class HttpResponse internal constructor(
 
 /** Plain HttpURLConnection with manual, policy-checked redirects. No cookies, no credentials. */
 object Http {
-    fun open(url: String, method: String, headers: Map<String, String>, policy: DownloadPolicy): HttpResponse {
+    fun open(url: String, method: String, headers: Map<String, String>, policy: DownloadPolicy, followRedirects: Boolean = true): HttpResponse {
         var current = url
         var hops = 0
         while (true) {
@@ -70,7 +70,7 @@ object Http {
             for ((k, v) in conn.headerFields) {
                 if (k != null && v.isNotEmpty()) responseHeaders[k.lowercase()] = v.last()
             }
-            if (code in intArrayOf(301, 302, 303, 307, 308)) {
+            if (code in intArrayOf(301, 302, 303, 307, 308) && followRedirects) {
                 val location = responseHeaders["location"]
                 conn.disconnect()
                 if (location == null) throw IOException("redirect without a location")

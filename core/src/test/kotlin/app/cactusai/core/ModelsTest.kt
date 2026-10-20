@@ -326,9 +326,11 @@ class ModelsTest {
         val s = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
         s.createContext("/tree") { ex -> ex.sendResponseHeaders(404, -1); ex.close() }
         s.createContext("/file") { ex ->
+            // Like the real host: a redirect to a CDN, with the content hash and size on the redirect itself.
             ex.responseHeaders.add("X-Linked-ETag", "\"$sha\"")
             ex.responseHeaders.add("X-Linked-Size", "777")
-            ex.sendResponseHeaders(200, -1)
+            ex.responseHeaders.add("Location", "http://127.0.0.1:1/signed-cdn-address")
+            ex.sendResponseHeaders(302, -1)
             ex.close()
         }
         s.start()

@@ -34,6 +34,9 @@ class MicRecorder(private val context: Context) {
     /** Ends the current recording normally; the audio so far is returned from [record]. */
     fun requestStop() = stopRequested.set(true)
 
+    /** Forgets a stop request left over from earlier. Call just before starting a recording. */
+    fun prepare() = stopRequested.set(false)
+
     /**
      * Records until [requestStop], [maxMs], or cancellation of the calling coroutine (which discards
      * the audio). [onProgress] gets the elapsed time and a 0..1 loudness for the on-screen indicator.
@@ -42,7 +45,7 @@ class MicRecorder(private val context: Context) {
     suspend fun record(maxMs: Long = Pcm.SINGLE_PASS_SECONDS * 1000L, onProgress: (elapsedMs: Long, level: Float) -> Unit): RecordedAudio =
         withContext(Dispatchers.IO) {
             if (!Permissions.hasMicrophone(context)) throw RecordingException("Microphone permission has not been granted.")
-            stopRequested.set(false)
+            // A stop requested while the microphone was still opening is honoured, so it is not cleared here.
 
             val minBuffer = AudioRecord.getMinBufferSize(Pcm.SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
             if (minBuffer <= 0) throw RecordingException("This phone does not support 16 kHz recording.")
@@ -95,6 +98,7 @@ class MicRecorder(private val context: Context) {
                 } catch (_: IllegalStateException) {
                 }
                 record.release()
+                stopRequested.set(false)
             }
         }
 }

@@ -23,7 +23,7 @@ object RemoteInfoFetcher {
     private fun fromListing(spec: ModelSpec, policy: DownloadPolicy, treeUrl: String): RemoteInfo? = try {
         Http.open(treeUrl, "GET", mapOf("Accept" to "application/json"), policy).use { r ->
             if (r.code != 200 || r.body == null) return null
-            val text = String(r.body.readNBytes(MAX_LISTING_BYTES), Charsets.UTF_8)
+            val text = String(readLimited(r.body, MAX_LISTING_BYTES), Charsets.UTF_8)
             val entries = (Json.parseOrNull(text) as? JsonValue.Arr)?.items ?: return null
             val entry = entries.firstNotNullOfOrNull { e ->
                 (e as? JsonValue.Obj)?.takeIf { it.string("path") == spec.fileName }
@@ -37,9 +37,26 @@ object RemoteInfoFetcher {
         null
     }
 
+    /** InputStream.readNBytes needs Android 13; this works on every supported version. */
+    private fun readLimited(stream: java.io.InputStream, limit: Int): ByteArray {
+        val out = java.io.ByteArrayOutputStream()
+        val buf = ByteArray(8192)
+        while (out.size() < limit) {
+            val n = stream.read(buf, 0, minOf(buf.size, limit - out.size()))
+            if (n < 0) break
+            out.write(buf, 0, n)
+        }
+        return out.toByteArray()
+    }
+
+    /**
+     * The file host answers a download URL with a redirect to a signed CDN address and puts the content
+     * hash and size on that first answer (X-Linked-ETag, X-Linked-Size). Like the upstream client, read
+     * them there without following the redirect: a signed address made for GET may refuse HEAD.
+     */
     private fun fromHeaders(policy: DownloadPolicy, fileUrl: String): RemoteInfo = try {
-        Http.open(fileUrl, "HEAD", emptyMap(), policy).use { r ->
-            if (r.code !in 200..299) return RemoteInfo(null, null)
+        Http.open(fileUrl, "HEAD", emptyMap(), policy, followRedirects = false).use { r ->
+            if (r.code !in 200..399) return RemoteInfo(null, null)
             val sha = r.headers["x-linked-etag"]?.trim('"', ' ')?.lowercase()?.takeIf(Sha256::isHex64)
             val size = (r.headers["x-linked-size"] ?: r.headers["content-length"])?.trim()?.toLongOrNull()?.takeIf { it > 0 }
             RemoteInfo(size, sha)

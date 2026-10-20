@@ -88,6 +88,7 @@ class AssistantController(
             _state.value = AssistantUiState(permission = PermissionNeed.MICROPHONE, status = "Allow the microphone to talk to me.")
             return
         }
+        recorder.prepare()
         job = scope.launch { runVoice() }
     }
 
