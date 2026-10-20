@@ -31,8 +31,10 @@ hosted endpoint unless those are set.
   it found). That is evidence, not a guarantee: the engine is a closed binary and was not audited line by line.
 * **You can check it yourself:** after the models are installed, Android's Settings → Network & internet → Data usage
   → App data usage → Cactus AI should stay at zero while you use voice and offline commands.
-  If you want a hard guarantee, revoke the INTERNET permission after installing the models is not possible on
-  stock Android, but an Android firewall or a per-app "Wi-Fi/mobile data off" switch in App info does the same.
+  For a hard guarantee: stock Android lets you switch off an app's network access (App info → Mobile data & Wi-Fi,
+  or Airplane mode, or a firewall app), which blocks every connection from the app, including any the
+  vendor engine might try. Do that after the models are installed; downloads and web searches then stop working
+  until you switch it back on.
 
 ## Permissions
 
