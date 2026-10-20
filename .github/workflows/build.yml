@@ -1,0 +1,86 @@
+name: build
+
+# Compiles the whole project on the same OS family the app is developed on (Windows) and on Linux,
+# runs the unit tests, fetches the official Needle engine, links it into the app, and keeps the
+# debug APK as a build artifact. GitHub-hosted runners have the Android SDK and internet access.
+# Device and emulator tests are NOT run here: the engine is arm64-only and needs a real phone.
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  core:
+    name: core tests (Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Unit tests for :core (includes the JNI marshalling tests against the test double)
+        run: ./gradlew :core:test --stacktrace
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: core-test-report
+          path: core/build/reports/tests/test
+          retention-days: 7
+
+  android:
+    name: debug APK (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Fetch the Needle engine (Linux)
+        if: runner.os != 'Windows'
+        run: scripts/fetch-engine.sh
+      - name: Fetch the Needle engine (Windows PowerShell)
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: powershell -ExecutionPolicy Bypass -File scripts\fetch-engine.ps1
+
+      - name: Build debug APK, lint and Android unit tests
+        shell: bash
+        run: ./gradlew :app:assembleDebug :app:lintDebug :app:testDebugUnitTest --stacktrace
+
+      - name: Show the APK
+        shell: bash
+        run: |
+          ls -la dist/
+          unzip -l dist/CactusAI-debug.apk | grep -E 'lib/|classes|AndroidManifest' || true
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CactusAI-debug-apk-${{ runner.os }}
+          path: dist/CactusAI-debug.apk
+          retention-days: 14
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: android-reports-${{ runner.os }}
+          path: |
+            app/build/reports/lint-results-debug.html
+            app/build/reports/tests
+          retention-days: 7

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- A simple cactus: trunk and two arms, inside the adaptive-icon safe zone. -->
+    <path
+        android:fillColor="#7BD88F"
+        android:pathData="M48,30 a6,6 0 0 1 12,0 L60,78 L48,78 Z" />
+    <path
+        android:fillColor="#7BD88F"
+        android:pathData="M36,48 h6 v14 h12 v8 h-18 Z" />
+    <path
+        android:fillColor="#7BD88F"
+        android:pathData="M72,40 h-6 v18 h-10 v8 h16 Z" />
+    <path
+        android:fillColor="#3E7C4F"
+        android:pathData="M44,78 h20 v6 h-20 Z" />
+</vector>
