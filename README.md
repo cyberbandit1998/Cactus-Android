@@ -23,7 +23,7 @@ files**. So:
 | The whole project **builds** on GitHub's Linux **and Windows** runners, links the real engine, and produces an arm64 debug APK (`lib/arm64-v8a/libcactusai_native.so` inside) | GitHub Actions, workflow `build` |
 | An unsigned release build (R8 shrinking) and the on-device test sources **compile** | Same workflow |
 | 120+ unit tests of the safety rules, parsers, planner, matcher, `.cact` checks, downloader (against a real local HTTP server: resume, corruption, redirects), step runner, history | `./gradlew :core:test`, run in CI and locally |
-| The JNI glue handles UTF-8/emoji, float arrays, errors, concurrency, and sets the telemetry opt-out | 13 JVM tests against a **test double** of the engine's C ABI (not the real engine) |
+| The JNI glue handles UTF-8/emoji, float arrays, errors, concurrency, and sets the telemetry opt-out | 14 JVM tests against a **test double** of the engine's C ABI (not the real engine) |
 
 | **Not verified — needs your Pixel 7** | Where to check |
 | --- | --- |

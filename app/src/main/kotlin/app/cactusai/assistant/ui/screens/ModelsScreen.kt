@@ -30,6 +30,7 @@ import app.cactusai.assistant.ui.components.SectionCard
 import app.cactusai.core.metrics.Timings
 import app.cactusai.core.models.ModelKind
 import app.cactusai.core.models.ModelStatus
+import app.cactusai.core.tools.ToolDetail
 import java.util.Locale
 
 fun formatBytes(bytes: Long): String = when {
@@ -80,6 +81,23 @@ fun ModelsScreen(
             Text("Phone temperature: $thermalLabel", style = MaterialTheme.typography.bodyMedium)
             engine.needlePrefixTokens?.let {
                 Text("Command model setup: $it prompt tokens in ${engine.needleInitMs ?: 0} ms (re-done only when the tools or the date change)", style = MaterialTheme.typography.bodyMedium)
+            }
+            engine.toolDetail?.let { detail ->
+                Text(
+                    "Tool list the engine accepted: " + when (detail) {
+                        ToolDetail.FULL -> "full wording"
+                        ToolDetail.COMPACT -> "shorter wording (the full list did not fit)"
+                        ToolDetail.MINIMAL -> "shortest wording, without routing hints (the longer lists were refused)"
+                    },
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
+            if (engine.screenToolsLeftOut) {
+                Text(
+                    "Screen-control tools were left out because even the shortest list did not fit with them. Scrolling, tapping and typing by voice will not be understood.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.error,
+                )
             }
             if (lastTimings == null) {
                 Text(
