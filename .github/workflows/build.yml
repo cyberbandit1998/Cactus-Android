@@ -50,8 +50,20 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - uses: android-actions/setup-android@v3
       - uses: gradle/actions/setup-gradle@v4
+
+      # GitHub-hosted runners already contain the Android SDK; AGP downloads the missing NDK/CMake
+      # pieces once the licences are accepted.
+      - name: Accept Android SDK licences
+        shell: bash
+        run: |
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          SDKM="$(command -v sdkmanager || true)"
+          if [ -z "$SDKM" ]; then SDKM="$(ls -d "$ANDROID_HOME"/cmdline-tools/*/bin/sdkmanager* 2>/dev/null | head -1 || true)"; fi
+          echo "sdkmanager: $SDKM"
+          if [ -n "$SDKM" ]; then yes | "$SDKM" --licenses > /dev/null || true; fi
+          ls "$ANDROID_HOME" || true
+          ls "$ANDROID_HOME/ndk" 2>/dev/null || true
 
       - name: Fetch the Needle engine (Linux)
         if: runner.os != 'Windows'
