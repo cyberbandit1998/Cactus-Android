@@ -129,6 +129,17 @@ class AssistantController(
         _state.value = AssistantUiState(phase = Phase.DONE, recognizedText = wasText, response = "Cancelled.", outcome = Outcome.CANCELLED)
     }
 
+    /**
+     * The app left the screen. Android silences the microphone for background apps, so a recording in
+     * progress would capture nothing: stop it and say why. Work that is already past recording is left alone.
+     */
+    fun onAppBackgrounded() {
+        if (_state.value.phase != Phase.LISTENING) return
+        job?.cancel()
+        job = null
+        _state.value = AssistantUiState(phase = Phase.DONE, response = "Listening stopped because Cactus AI left the screen. Open it and tap the microphone again.", outcome = Outcome.CANCELLED)
+    }
+
     fun clear() {
         if (!isBusy) _state.value = AssistantUiState()
     }

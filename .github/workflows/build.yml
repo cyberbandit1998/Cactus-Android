@@ -73,9 +73,9 @@ jobs:
         shell: powershell
         run: powershell -ExecutionPolicy Bypass -File scripts\fetch-engine.ps1
 
-      - name: Build debug APK, lint and Android unit tests
+      - name: Build debug APK, compile the device tests, lint, unit tests and an unsigned release build
         shell: bash
-        run: ./gradlew :app:assembleDebug :app:lintDebug :app:testDebugUnitTest --stacktrace
+        run: ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug :app:testDebugUnitTest :app:assembleRelease --stacktrace
 
       - name: Inspect the engine (compare its real header and symbols with native/shim/needle_abi.h)
         if: always() && runner.os == 'Linux'

@@ -13,12 +13,18 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         val container = (application as CactusApp).container
-        // Opened through the system's "assist" action (assistant gesture): start listening, but only a fresh launch.
+        // Opened through the system's "assist" action (assistant gesture): start listening, but only on a fresh launch.
         val asAssistant = savedInstanceState == null && intent?.action == Intent.ACTION_ASSIST
         setContent {
             CactusTheme {
                 AppRoot(container = container, startListening = asAssistant)
             }
         }
+    }
+
+    override fun onStop() {
+        super.onStop()
+        // A rotation recreates the activity but keeps the app in front; only a real departure stops listening.
+        if (!isChangingConfigurations) (application as CactusApp).container.controller.onAppBackgrounded()
     }
 }
