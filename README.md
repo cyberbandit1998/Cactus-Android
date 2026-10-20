@@ -70,9 +70,10 @@ choose the `app` configuration and press Run with the phone selected.
 No Windows machine handy? Every push builds a debug APK in GitHub Actions: open the repository's **Actions** tab,
 the latest `build` run, and download the artifact `CactusAI-debug-apk-Windows` (or `-Linux`).
 
-If `dist/CactusAI-debug.apk` is present in the repository, it was built by that workflow on the Windows runner and
-committed unchanged by its manual `commit_apk` option; `dist/BUILD-INFO.txt` gives the source commit and SHA-256. It is a
-**debug-signed, never-run-on-a-phone** build. Its signing key is a throwaway on the CI runner, so an APK built on your own PC
+`dist/CactusAI-debug.apk` is already in this repository: it was built by that workflow on the Windows runner and
+committed unchanged by its manual `commit_apk` option (`adb install -r dist/CactusAI-debug.apk` works straight from a
+clone). `dist/BUILD-INFO.txt` gives the source commit, run and SHA-256. It is a **debug-signed, never-run-on-a-phone** build,
+and it only matches the source at the commit named there. Its signing key is a throwaway on the CI runner, so an APK built on your own PC
 has a different signature and cannot be installed over it without uninstalling first.
 
 ### If the build fails

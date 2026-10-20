@@ -75,6 +75,7 @@ memory/string (`memcpy memmove memset memcmp strlen strstr strtod atoi atof ...`
 | The APK contains `lib/arm64-v8a/libcactusai_native.so` (about 2 MB, engine linked in) | `unzip -l` in the log |
 | An unsigned release build with R8, and the instrumented-test sources, compile | Same job (`assembleRelease`, `assembleDebugAndroidTest`) |
 | Lint: 0 errors | Lint summary step (39 warnings, all version-update or housekeeping hints) |
+| The Apache-2.0 text is inside the APK (`assets/Apache-2.0.txt`) and the arm64 library is inside it; the build and the APK-commit job fail if either is missing | `unzip -l` checks in the workflow, passing on the Linux job and in the Windows-APK commit job (run of commit `3fd9431`) |
 | The debug APK: package `app.cactusai.assistant` 0.1.0, `targetSdkVersion` 35, `native-code: arm64-v8a`, signed with the v2 scheme (`apksigner verify` says "Verifies"), requests only `INTERNET`, `ACCESS_NETWORK_STATE`, `RECORD_AUDIO`, `READ_CONTACTS`, `com.android.alarm.permission.SET_ALARM` and AndroidX's `...DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION` (a signature permission it adds itself); native libraries inside: `libcactusai_native.so` (about 2.0 MB) and `libandroidx.graphics.path.so` | `aapt2 dump badging`, `apksigner verify`, `unzip -l` in the CI log (Linux job, run of commit `5900c97`) |
 | 121 `:core` JVM tests pass (including the JNI glue against a test double) | `core tests (Linux)` job and local runs |
 

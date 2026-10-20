@@ -96,8 +96,8 @@ test double that only echoes), that Android behaves as the intents expect, or an
 * **Cancelling inference:** a model call already running cannot be interrupted; its result is discarded.
 * **Release APK size / minimising:** debug APK is about 25 MB (mostly debug Compose dex). The release build uses R8;
   its size was not recorded here.
-* **APK in `dist/`:** the Windows-built CI APK is committed there by the workflow's manual `commit_apk` option (see
-  `dist/BUILD-INFO.txt` for the source commit and SHA-256). It is debug-signed with a throwaway CI key and has never been run
+* **APK in `dist/`:** the Windows-built CI APK (25,370,561 bytes, built from commit `3fd9431`, run 39471386059) is committed there by the
+  workflow's manual `commit_apk` option; `dist/BUILD-INFO.txt` is the authority for its SHA-256 and source commit. It is debug-signed with a throwaway CI key and has never been run
   on a phone. It contains the vendor engine statically linked, which the engine's repository declares Apache-2.0 (NOTICE.md).
   To build your own: `scripts\build-debug.ps1`; the CI artifact `CactusAI-debug-apk-Windows` is the same build.
 * **Targets:** `targetSdk 35`, `minSdk 29`, arm64-v8a only. Lint notes newer SDKs/libraries exist; the pinned
