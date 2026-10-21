@@ -159,5 +159,5 @@ voice-to-answer path.
   green; its Windows-built APK is `dist/CactusAI-debug.apk` (26,026,397 bytes, SHA-256 in `dist/BUILD-INFO.txt`). A local check of
   the committed file matches that checksum, holds `lib/arm64-v8a/libcactusai_native.so` and `assets/Apache-2.0.txt`, and
   requests only: ACCESS_NETWORK_STATE, INTERNET, READ_CONTACTS, RECORD_AUDIO and SET_ALARM, plus the two `BIND_*` permissions that
-  protect the services and the `DUMP` permission from a library. The manifest declares the `TTS_SERVICE` package-visibility query.
+  protect the services and a `DUMP` permission; the list is identical to the previous APK's, so this version asks for no new permission. The manifest declares the `TTS_SERVICE` package-visibility query.
 * None of this ran on a phone.
