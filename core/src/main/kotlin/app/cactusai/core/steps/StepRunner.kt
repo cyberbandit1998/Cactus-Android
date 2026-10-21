@@ -1,5 +1,6 @@
 package app.cactusai.core.steps
 
+import app.cactusai.core.info.InfoAnswer
 import app.cactusai.core.plan.Hint
 import app.cactusai.core.tools.ValidatedCall
 import kotlinx.coroutines.CancellationException
@@ -21,7 +22,8 @@ sealed interface ResultAction {
 data class ResultItem(val title: String, val subtitle: String? = null, val action: ResultAction = ResultAction.None)
 
 sealed interface StepOutcome {
-    data class Success(val message: String, val results: List<ResultItem> = emptyList()) : StepOutcome
+    /** [answer] carries the details of an information answer (where it came from, its sources, caveats) for the screen and the speaker. */
+    data class Success(val message: String, val results: List<ResultItem> = emptyList(), val answer: InfoAnswer? = null) : StepOutcome
     data class Failure(val message: String) : StepOutcome
 
     /** Several apps/contacts matched; the UI asks, then [resolve] finishes the step with the picked [Choice]. */
@@ -50,6 +52,8 @@ data class StepPolicy(
     val perStepTimeoutMs: Long = 8_000,
     /** Pause between steps so the screen the next step needs has time to appear. */
     val settleMs: Long = 600,
+    /** Tools that legitimately take longer (a web page has to load and be read), by name. */
+    val toolTimeoutMs: Map<String, Long> = emptyMap(),
 )
 
 sealed interface StepEvent {
@@ -61,6 +65,10 @@ sealed interface StepEvent {
 
 sealed interface RunResult {
     val events: List<StepEvent>
+
+    /** The information answers produced by the steps that finished, in order. */
+    val answers: List<InfoAnswer>
+        get() = events.filterIsInstance<StepEvent.Finished>().mapNotNull { (it.outcome as? StepOutcome.Success)?.answer }
 
     data class Completed(override val events: List<StepEvent>, val messages: List<String>, val results: List<ResultItem>) : RunResult
 
@@ -87,7 +95,7 @@ class StepRunner(private val executor: StepExecutor, private val policy: StepPol
         for ((i, call) in steps.withIndex()) {
             emit(StepEvent.Started(i, steps.size, call))
             val outcome = try {
-                withTimeoutOrNull(policy.perStepTimeoutMs) { executor.execute(call) }
+                withTimeoutOrNull(policy.toolTimeoutMs[call.name] ?: policy.perStepTimeoutMs) { executor.execute(call) }
             } catch (e: CancellationException) {
                 emit(StepEvent.Cancelled(i, call))
                 throw e
