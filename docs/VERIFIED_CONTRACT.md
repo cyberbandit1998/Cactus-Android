@@ -149,3 +149,15 @@ Real-voice behaviour of the end-of-speech detector; Chrome's accessibility tree 
 addresses, ads, consent screens) and whether the parser's rules hold on it; whether Android lets the app return to the front
 after a search; the system voice; how well Needle chooses between 24 tools in the context window it has; the speed of the whole
 voice-to-answer path.
+
+### 6.4 Build evidence for this version
+
+* Commit `0d6c357` (the app wiring) was built by GitHub Actions run 39523520891: `core tests (Linux)` (389 JVM tests, warnings
+  as errors), `debug APK (ubuntu-latest)` and `debug APK (windows-latest)` all green, each including the debug APK, the compiled
+  (not run) device tests, lint, the app's unit tests and an unsigned release build.
+* Commit `75ef0b0` (docs, device tests, spelling hints) was built by run 39524286666 (manual dispatch with `commit_apk`), also
+  green; its Windows-built APK is `dist/CactusAI-debug.apk` (26,026,397 bytes, SHA-256 in `dist/BUILD-INFO.txt`). A local check of
+  the committed file matches that checksum, holds `lib/arm64-v8a/libcactusai_native.so` and `assets/Apache-2.0.txt`, and
+  requests only: ACCESS_NETWORK_STATE, INTERNET, READ_CONTACTS, RECORD_AUDIO and SET_ALARM, plus the two `BIND_*` permissions that
+  protect the services and the `DUMP` permission from a library. The manifest declares the `TTS_SERVICE` package-visibility query.
+* None of this ran on a phone.
