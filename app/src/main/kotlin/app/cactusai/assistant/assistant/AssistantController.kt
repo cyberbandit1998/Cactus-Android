@@ -256,7 +256,7 @@ class AssistantController(
             )
         }
 
-        val keywords = if (settings.current.biasSpeechToAppNames) withContext(Dispatchers.IO) { apps.speechKeywords() } else null
+        val keywords = if (settings.current.biasSpeechToAppNames) withContext(Dispatchers.IO) { speechKeywords() } else null
         val turn = VoiceTurn.afterCapture(
             audio = audio,
             trimSilence = settings.current.trimSilence,
@@ -290,6 +290,12 @@ class AssistantController(
                 }
             }
         }
+    }
+
+    /** Names handed to Whistle as spelling hints, one per line: installed apps and the favourite teams from Settings. */
+    private fun speechKeywords(): String? {
+        val teams = settings.current.assistant.favoriteTeams.filter { it.length in 3..40 }.take(10)
+        return listOfNotNull(apps.speechKeywords(), teams.joinToString("\n").ifBlank { null }).joinToString("\n").ifBlank { null }
     }
 
     private fun overheatingMessage(): String? =

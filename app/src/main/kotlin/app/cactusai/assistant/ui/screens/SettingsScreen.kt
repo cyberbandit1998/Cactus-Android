@@ -94,7 +94,7 @@ fun SettingsScreen(
             SwitchRow("Trim silence before transcribing", "Removes quiet parts at the start and end of a recording.", settings.trimSilence) { on ->
                 container.settings.update { it.copy(trimSilence = on) }
             }
-            SwitchRow("Help recognise app names", "Gives the speech model the names of your installed apps, so \"Spotify\" is spelled right. They stay on the phone.", settings.biasSpeechToAppNames) { on ->
+            SwitchRow("Help recognise app names", "Gives the speech model the names of your installed apps and your favourite teams, so \"Spotify\" and \"Tigers\" are spelled right. They stay on the phone.", settings.biasSpeechToAppNames) { on ->
                 container.settings.update { it.copy(biasSpeechToAppNames = on) }
             }
             Text("Language: English. Whistle also supports German, French, Spanish, Italian, Dutch and Polish; they are not switched on yet.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
