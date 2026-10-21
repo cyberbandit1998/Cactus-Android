@@ -2,11 +2,13 @@
 <!--
   Optional screen control. Not active until the user turns it on in Android's Accessibility settings.
   Events are only used to notice that the screen changed; their content is never read or stored.
+  The window text is read only when a command needs it: to find a control the user named, or to read the results of a web
+  search the user asked for. flagReportViewIds lets the service tell a browser's own buttons from the page it shows.
 -->
 <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
     android:accessibilityEventTypes="typeWindowStateChanged|typeWindowContentChanged"
     android:accessibilityFeedbackType="feedbackGeneric"
-    android:accessibilityFlags="flagDefault"
+    android:accessibilityFlags="flagDefault|flagReportViewIds"
     android:canPerformGestures="true"
     android:canRetrieveWindowContent="true"
     android:description="@string/accessibility_service_description"

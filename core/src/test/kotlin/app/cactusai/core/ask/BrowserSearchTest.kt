@@ -25,6 +25,7 @@ class BrowserSearchTest {
     private class FakeOps(
         var opens: Boolean = true,
         override var canRead: Boolean = true,
+        override var isOnline: Boolean = true,
         val pages: MutableList<PageSnapshot?> = mutableListOf(),
     ) : BrowserOps {
         val opened = mutableListOf<String>()
@@ -165,5 +166,15 @@ class BrowserSearchTest {
         assertEquals(0, ops.returns)
         assertEquals(readsAtCancel, ops.reads)
         assertNull(null)
+    }
+
+    @Test
+    fun withoutAConnectionNothingIsOpenedAndTheAnswerSaysWhy() = runTest {
+        val ops = FakeOps(isOnline = false, pages = mutableListOf(page("A")))
+        val r = search(ops).search("telephone") as SearchOutcome.Failed
+        assertEquals(WebFailure.OFFLINE, r.kind)
+        assertTrue(ops.opened.isEmpty())
+        assertFalse(r.browserShowsResults)
+        assertTrue(r.message.contains("offline"))
     }
 }

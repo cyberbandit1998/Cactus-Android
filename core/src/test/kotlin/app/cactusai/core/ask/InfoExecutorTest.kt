@@ -269,4 +269,28 @@ class InfoExecutorTest {
         assertFalse(e.handles("open_app"))
         assertFalse(e.handles("send_text"))
     }
+
+    @Test
+    fun theBatteryToolIsAnsweredFromThePhoneFactsSoItCanBeSpoken() {
+        val e = executor(null)
+        assertTrue(e.handles("check_battery"))
+        val out = run(e, call("check_battery"))
+        assertEquals("Your battery is at 82% and charging over USB.", out.message)
+        assertNotNull(out.answer)
+        assertEquals(AnswerOrigin.LOCAL, out.answer!!.origin)
+    }
+
+    @Test
+    fun anAnswerBecomesAStepWithItsSourcesAsRows() {
+        val e = executor(null)
+        val answer = app.cactusai.core.info.InfoAnswer(
+            "Bell.", origin = AnswerOrigin.ONLINE,
+            sources = listOf(app.cactusai.core.info.Source("Telephone", "https://example.org/phone", "A device")),
+        )
+        val out = e.outcomeOf(answer)
+        assertEquals("Bell.", out.message)
+        assertEquals(1, out.results.size)
+        assertEquals(ResultAction.OpenUri("https://example.org/phone"), out.results.single().action)
+        assertEquals(answer, out.answer)
+    }
 }

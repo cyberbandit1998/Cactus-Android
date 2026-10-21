@@ -17,6 +17,9 @@ enum class WebFailure {
     TIMEOUT,
     NO_BROWSER,
     BAD_REQUEST,
+
+    /** The phone has no internet connection, so nothing was opened. */
+    OFFLINE,
 }
 
 sealed interface SearchOutcome {

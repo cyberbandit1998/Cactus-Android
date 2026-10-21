@@ -67,12 +67,13 @@ class InfoExecutor(
     @Volatile
     var userText: String = ""
 
-    fun handles(tool: String): Boolean = tool in TOOLS
+    /** The information tools, plus the older battery tool, which is answered from the same phone facts so it can be spoken too. */
+    fun handles(tool: String): Boolean = tool in TOOLS || tool == AssistantTools.CHECK_BATTERY
 
-    suspend fun execute(call: ValidatedCall): StepOutcome {
-        val answer = answer(call)
-        return StepOutcome.Success(answer.text, sourceItems(answer), answer)
-    }
+    suspend fun execute(call: ValidatedCall): StepOutcome = outcomeOf(answer(call))
+
+    /** An answer as a finished step: its text for the screen, its sources as rows to open, and the answer itself for the speaker. */
+    fun outcomeOf(answer: InfoAnswer): StepOutcome.Success = StepOutcome.Success(answer.text, sourceItems(answer), answer)
 
     private fun sourceItems(a: InfoAnswer): List<ResultItem> =
         a.sources.map { ResultItem(it.title, listOfNotNull(it.host, it.snippet).joinToString(" · "), ResultAction.OpenUri(it.url)) }
@@ -85,6 +86,7 @@ class InfoExecutor(
             AssistantTools.GET_TIME -> TimeAnswer.answer(clock, loc, s.use24Hour, a.string("place"))
             AssistantTools.GET_DATE -> DateInfo.answer(a.string("day"), userText, clock, loc)
             AssistantTools.DEVICE_INFO -> DeviceAnswers.describe(a.string("topic"), device(), loc)
+            AssistantTools.CHECK_BATTERY -> DeviceAnswers.battery(device())
             AssistantTools.CALCULATE -> calculate(a.string("expression").orEmpty())
             AssistantTools.SPORTS_INFO -> sports(a, s, loc)
             AssistantTools.WEATHER_INFO -> {

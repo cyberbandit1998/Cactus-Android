@@ -22,6 +22,9 @@ interface BrowserOps {
     /** True while the Accessibility service is connected and can read other apps' windows. */
     val canRead: Boolean
 
+    /** False when the phone has no connection; the browser is then not opened at all. */
+    val isOnline: Boolean get() = true
+
     /** The page in front right now, or null when nothing readable is there. */
     suspend fun readPage(): PageSnapshot?
 
@@ -50,6 +53,9 @@ class BrowserSearch(
         val q = UntrustedText.clean(query, 200)
         if (q.isBlank()) return SearchOutcome.Failed(WebFailure.BAD_REQUEST, "There is nothing to search for.")
         val url = SearchSite.GOOGLE.searchUrl(q)
+        if (!ops.isOnline) {
+            return SearchOutcome.Failed(WebFailure.OFFLINE, "You're offline, so I can't look that up. Time, date, battery and calculations still work without a connection.")
+        }
         if (!ops.open(url)) return SearchOutcome.Failed(WebFailure.NO_BROWSER, "I couldn't open a web browser to search.")
         if (!ops.canRead) {
             return SearchOutcome.Failed(

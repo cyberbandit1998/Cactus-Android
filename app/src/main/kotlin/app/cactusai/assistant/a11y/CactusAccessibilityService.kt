@@ -3,14 +3,18 @@ package app.cactusai.assistant.a11y
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.GestureDescription
 import android.graphics.Path
+import android.content.Intent
 import android.graphics.Rect
 import android.os.Bundle
 import android.os.SystemClock
 import android.text.InputType
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
+import app.cactusai.assistant.MainActivity
+import app.cactusai.core.ask.PageSnapshot
+import app.cactusai.core.exec.TargetSafety
 import app.cactusai.core.match.NameMatcher
-import app.cactusai.core.match.TextNorm
+import app.cactusai.core.web.ReadNode
 import kotlin.coroutines.resume
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -192,13 +196,142 @@ class CactusAccessibilityService : AccessibilityService(), ScreenController {
         if (hit != null) ScreenResult.Done("Yes, “${hit.first}” is on the screen.") else ScreenResult.NotFound("I cannot see “$text” on this screen.")
     }
 
+    // ---- reading a search page aloud, and coming back ----
+
+    override suspend fun readPage(): PageSnapshot? = withContext(Dispatchers.Default) {
+        val root = rootInActiveWindow ?: return@withContext null
+        val pkg = root.packageName?.toString()
+        // Never read Android's permission and installer screens or anything that looks like a payment or banking app.
+        if (TargetSafety.isProtectedPackage(pkg) || TargetSafety.looksFinancial(pkg)) return@withContext PageSnapshot(pkg, emptyList())
+        PageSnapshot(pkg, readableText(root, pkg))
+    }
+
+    /**
+     * The window's text in reading order. When the browser shows its web page inside a WebView, only that part is read, so the
+     * address bar and tab buttons are left out; otherwise everything visible is read except the app's own controls (ids in its
+     * own namespace). Editable fields are skipped altogether, which also keeps anything typed into a form out of the answer.
+     */
+    private fun readableText(root: AccessibilityNodeInfo, pkg: String?): List<ReadNode> {
+        val webViews = ArrayList<AccessibilityNodeInfo>()
+        findWebViews(root, webViews, 0)
+        val starts = webViews.ifEmpty { listOf(root) }
+        val ownIds = pkg?.let { "$it:id/" }
+        val out = ArrayList<ReadNode>()
+        var visited = 0
+        // Depth-first with an explicit stack, children pushed in reverse so they come out in reading order.
+        val stack = ArrayDeque<AccessibilityNodeInfo>()
+        for (start in starts.asReversed()) stack.addFirst(start)
+        while (stack.isNotEmpty() && visited < READ_NODE_LIMIT && out.size < READ_TEXT_LIMIT) {
+            val n = stack.removeFirst()
+            visited++
+            if (!n.isVisibleToUser) continue
+            if (n.isEditable || isSensitiveField(n)) continue
+            val chromeId = webViews.isEmpty() && ownIds != null && n.viewIdResourceName?.startsWith(ownIds) == true
+            if (!chromeId) {
+                val text = (n.text ?: n.contentDescription)?.toString()?.trim().orEmpty()
+                if (text.isNotEmpty()) {
+                    out += ReadNode(
+                        text = text.take(READ_TEXT_CHARS),
+                        heading = n.isHeading,
+                        link = n.extras?.getString(EXTRA_TARGET_URL)?.takeIf { it.isNotBlank() },
+                        clickable = n.isClickable,
+                    )
+                }
+            }
+            for (i in n.childCount - 1 downTo 0) n.getChild(i)?.let { stack.addFirst(it) }
+        }
+        return out
+    }
+
+    private fun findWebViews(n: AccessibilityNodeInfo, out: MutableList<AccessibilityNodeInfo>, depth: Int) {
+        if (depth > 40 || out.size >= 4) return
+        if (n.className?.toString() == "android.webkit.WebView") {
+            out += n
+            return
+        }
+        for (i in 0 until n.childCount) n.getChild(i)?.let { findWebViews(it, out, depth + 1) }
+    }
+
+    override suspend fun returnToApp(): Boolean = withContext(Dispatchers.Default) {
+        if (ownWindowInFront()) return@withContext true
+        // Android limits starting activities from the background; this service is the app's best chance of being allowed.
+        try {
+            startActivity(
+                Intent(this@CactusAccessibilityService, MainActivity::class.java)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP),
+            )
+        } catch (_: RuntimeException) {
+        }
+        if (awaitOwnWindow(1500)) return@withContext true
+        // One Back press, only while a browser is still in front; if that does not bring the app back, the browser stays as it is.
+        if (rootInActiveWindow != null) performGlobalAction(GLOBAL_ACTION_BACK)
+        awaitOwnWindow(1500)
+    }
+
+    private fun ownWindowInFront(): Boolean = rootInActiveWindow?.packageName?.toString() == packageName
+
+    private suspend fun awaitOwnWindow(timeoutMs: Long): Boolean {
+        val deadline = SystemClock.elapsedRealtime() + timeoutMs
+        while (SystemClock.elapsedRealtime() < deadline) {
+            if (ownWindowInFront()) return true
+            delay(100)
+        }
+        return ownWindowInFront()
+    }
+
     // ---- clicking ----
 
+    /**
+     * Looks at the control that is about to be tapped (its label, its id, the text around it, the app it is in) and decides with
+     * the core's [TargetSafety] rules: go, ask first, or never. This is the second check; the first was made on the words the
+     * user spoke, before anything was looked at. A tap that could pay, send, delete, install or grant access always waits for the
+     * user's OK, however confident the model was and whether or not automatic execution is on.
+     */
     private suspend fun clickOrAsk(node: AccessibilityNodeInfo, label: String): ScreenResult {
-        if (isRisky(label)) {
-            return ScreenResult.NeedsApproval("Tap “$label”? This may be hard to undo.") { click(node, label) }
+        val verdict = TargetSafety.assessTap(
+            TargetSafety.Target(
+                label = label,
+                viewId = node.viewIdResourceName,
+                nearbyText = nearbyText(node),
+                packageName = node.packageName?.toString(),
+                sensitiveField = isSensitiveField(node),
+            ),
+        )
+        return when (verdict.verdict) {
+            TargetSafety.Verdict.BLOCKED -> ScreenResult.Blocked(verdict.reason ?: "I do not tap that.")
+            TargetSafety.Verdict.NEEDS_APPROVAL -> ScreenResult.NeedsApproval(verdict.reason ?: "Tap “$label”? This may be hard to undo.") { click(node, label) }
+            TargetSafety.Verdict.SAFE -> click(node, label)
         }
-        return click(node, label)
+    }
+
+    /** Short labels of the neighbours and the first few ancestors: the question or dialog message an "OK" button belongs to. */
+    private fun nearbyText(node: AccessibilityNodeInfo): List<String> {
+        val out = ArrayList<String>()
+        var parent = node.parent
+        var depth = 0
+        while (parent != null && depth < 3 && out.size < 16) {
+            shortText(parent)?.let { out += it }
+            for (i in 0 until parent.childCount) {
+                val child = parent.getChild(i) ?: continue
+                if (child == node) continue
+                collectShortText(child, out, 2)
+            }
+            parent = parent.parent
+            depth++
+        }
+        return out
+    }
+
+    private fun collectShortText(n: AccessibilityNodeInfo, out: MutableList<String>, depthLeft: Int) {
+        if (out.size >= 16 || isSensitiveField(n)) return
+        shortText(n)?.let { out += it }
+        if (depthLeft <= 0) return
+        for (i in 0 until n.childCount) n.getChild(i)?.let { collectShortText(it, out, depthLeft - 1) }
+    }
+
+    private fun shortText(n: AccessibilityNodeInfo): String? {
+        if (n.isPassword) return null
+        return (n.text ?: n.contentDescription)?.toString()?.trim()?.takeIf { it.isNotEmpty() }?.take(160)
     }
 
     private suspend fun click(node: AccessibilityNodeInfo, label: String): ScreenResult {
@@ -281,20 +414,13 @@ class CactusAccessibilityService : AccessibilityService(), ScreenController {
         ) return true
         if (cls == InputType.TYPE_CLASS_NUMBER && variation == InputType.TYPE_NUMBER_VARIATION_PASSWORD) return true
         if (!n.isEditable) return false
-        val hint = TextNorm.normalize(listOfNotNull(n.hintText, n.contentDescription).joinToString(" "))
-        return SENSITIVE_FIELD_WORDS.any { hint.contains(it) }
-    }
-
-    private fun isRisky(label: String): Boolean {
-        val norm = TextNorm.normalize(label)
-        val words = norm.split(' ').toSet()
-        return RISKY_WORDS.any { it in words } || RISKY_PHRASES.any { norm.contains(it) }
+        return TargetSafety.isSensitiveFieldHint(listOfNotNull(n.hintText, n.contentDescription).joinToString(" "))
     }
 
     /** Android's permission and installer screens are never driven by an assistant. */
     private fun blocked(root: AccessibilityNodeInfo): ScreenResult? {
         val pkg = root.packageName?.toString() ?: return null
-        return if (pkg in PROTECTED_PACKAGES) {
+        return if (TargetSafety.isProtectedPackage(pkg)) {
             ScreenResult.Blocked("I do not tap inside Android's permission and install screens. Please do that yourself.")
         } else {
             null
@@ -333,21 +459,11 @@ class CactusAccessibilityService : AccessibilityService(), ScreenController {
         )
         if (!accepted && cont.isActive) cont.resume(false)
     }
-
-    private companion object {
-        val PROTECTED_PACKAGES = setOf(
-            "com.google.android.permissioncontroller",
-            "com.android.permissioncontroller",
-            "com.google.android.packageinstaller",
-            "com.android.packageinstaller",
-        )
-        val RISKY_WORDS = setOf(
-            "pay", "buy", "purchase", "order", "send", "delete", "remove", "confirm", "transfer", "submit",
-            "checkout", "subscribe", "install", "uninstall", "erase", "reset", "withdraw", "donate",
-        )
-        val RISKY_PHRASES = listOf("place order", "sign out", "log out", "factory reset", "clear data")
-        val SENSITIVE_FIELD_WORDS = listOf(
-            "password", "passcode", "pin code", "card number", "credit card", "debit card", "cvv", "cvc", "security code", "expiry",
-        )
-    }
 }
+
+private const val READ_NODE_LIMIT = 1500
+private const val READ_TEXT_LIMIT = 400
+private const val READ_TEXT_CHARS = 500
+
+/** Chrome (and browsers built on it) put the address a link goes to under this key. Where a browser does not, the link is simply missing. */
+private const val EXTRA_TARGET_URL = "AccessibilityNodeInfo.targetUrl"

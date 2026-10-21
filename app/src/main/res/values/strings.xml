@@ -2,6 +2,6 @@
 <resources>
     <string name="app_name">Cactus AI</string>
     <string name="accessibility_service_label">Cactus AI screen control</string>
-    <string name="accessibility_service_description">Optional. Lets Cactus AI scroll, go back, tap buttons you name and type text you dictate, only when you ask. It looks at the screen only to find what you named, keeps nothing, and never types into password or payment fields. Turn it off here at any time.</string>
+    <string name="accessibility_service_description">Optional. Lets Cactus AI scroll, go back, tap buttons you name and type text you dictate, only when you ask. When you ask it to search the web, it can also read the results page in your browser so it can say the answer aloud. It looks at the screen only for those things, keeps nothing, never reads or types into password or payment fields, and asks you first before tapping anything that could spend money, send, delete or change security. Turn it off here at any time.</string>
     <string name="assistant_service_label">Cactus AI</string>
 </resources>
