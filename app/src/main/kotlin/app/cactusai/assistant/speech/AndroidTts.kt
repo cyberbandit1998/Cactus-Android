@@ -75,7 +75,7 @@ class AndroidTtsEngine(
         val wanted = Locale.getDefault()
         val result = engine.setLanguage(wanted)
         if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) engine.setLanguage(Locale.US)
-        onVoices(voiceOptions(engine))
+        onVoices(try { voiceOptions(engine) } catch (_: RuntimeException) { emptyList() })
     }
 
     override fun speak(utteranceId: String, text: String, settings: SpeechSettings, append: Boolean) {

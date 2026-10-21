@@ -1,5 +1,6 @@
 package app.cactusai.assistant.ui.components
 
+import android.text.format.DateFormat
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -35,6 +36,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
@@ -43,11 +45,16 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import app.cactusai.assistant.assistant.AssistantUiState
 import app.cactusai.assistant.assistant.PermissionNeed
+import app.cactusai.core.exec.ExecutionMode
 import app.cactusai.core.history.InputSource
 import app.cactusai.core.history.Outcome
+import app.cactusai.core.info.AnswerOrigin
+import app.cactusai.core.info.InfoAnswer
 import app.cactusai.core.plan.Hint
 import app.cactusai.core.steps.Choice
 import app.cactusai.core.steps.ResultItem
+import java.util.Date
+import kotlin.math.roundToInt
 
 class PanelActions(
     val onConfirm: () -> Unit,
@@ -57,6 +64,7 @@ class PanelActions(
     val onResultClick: (ResultItem) -> Unit,
     val onGrantPermission: (PermissionNeed) -> Unit,
     val onOpenAccessibility: () -> Unit,
+    val onStopSpeaking: () -> Unit = {},
 )
 
 @Composable
@@ -90,6 +98,10 @@ fun AssistantPanel(
     actions: PanelActions,
     showRawJson: Boolean,
     modifier: Modifier = Modifier,
+    /** True while an answer is being read aloud: shows the Stop speaking button. */
+    speaking: Boolean = false,
+    /** The "Show the model's confidence" setting. */
+    showConfidence: Boolean = true,
 ) {
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(12.dp)) {
         if (state.recognizedText.isNotBlank()) {
@@ -111,6 +123,8 @@ fun AssistantPanel(
                 Text(state.status, style = MaterialTheme.typography.bodyLarge)
             }
         }
+
+        RunFacts(state, showConfidence)
 
         state.confirmation?.let { c ->
             SectionCard(title = "Please confirm") {
@@ -143,7 +157,11 @@ fun AssistantPanel(
                 Column(Modifier.semantics { liveRegion = LiveRegionMode.Polite }) {
                     SelectionContainer { Text(state.response, style = MaterialTheme.typography.bodyLarge) }
                 }
+                state.answers.forEach { AnswerFacts(it) }
+                if (speaking) OutlinedButton(onClick = actions.onStopSpeaking) { Text("Stop speaking") }
             }
+        } else if (speaking) {
+            OutlinedButton(onClick = actions.onStopSpeaking) { Text("Stop speaking") }
         }
 
         if (state.action.isNotBlank()) {
@@ -201,6 +219,45 @@ fun AssistantPanel(
                 RawJson(state.rawJson, startOpen = showRawJson)
             }
         }
+    }
+}
+
+/** Whether the command ran by itself or after a yes, and the model's own confidence (never a made-up one). */
+@Composable
+private fun RunFacts(state: AssistantUiState, showConfidence: Boolean) {
+    val lines = buildList {
+        if (showConfidence && state.confidenceKnown) {
+            add(state.confidence?.let { "Model confidence: ${(it * 100).roundToInt()}%" } ?: "The model gave no confidence, so I ask before acting.")
+        }
+        state.executionMode?.let {
+            add(
+                when (it) {
+                    ExecutionMode.AUTOMATIC -> if (state.busy) "Running automatically" else "Ran automatically"
+                    ExecutionMode.CONFIRMED -> if (state.busy) "Running after you confirmed" else "Ran after you confirmed"
+                },
+            )
+        }
+    }
+    if (lines.isEmpty()) return
+    Column(Modifier.semantics { liveRegion = LiveRegionMode.Polite }) {
+        lines.forEach { Text(it, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+    }
+}
+
+/** Where an answer came from, and how far it can be trusted, in words. */
+@Composable
+private fun AnswerFacts(answer: InfoAnswer) {
+    val context = LocalContext.current
+    val where = if (answer.origin == AnswerOrigin.ONLINE) {
+        val checked = answer.retrievedAtMs?.let { " · checked " + DateFormat.getTimeFormat(context).format(Date(it)) }.orEmpty()
+        "Online$checked"
+    } else {
+        "Answered on this phone"
+    }
+    Text(where, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+    answer.note?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+    if (answer.origin == AnswerOrigin.ONLINE && !answer.verified) {
+        Text("Not independently confirmed. Open a source below to check.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 

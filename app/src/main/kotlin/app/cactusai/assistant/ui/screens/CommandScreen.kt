@@ -42,6 +42,8 @@ fun CommandScreen(
     state: AssistantUiState,
     ready: Boolean,
     showRawJson: Boolean,
+    speaking: Boolean = false,
+    showConfidence: Boolean = true,
     onSubmit: (String) -> Unit,
     onCancel: () -> Unit,
     panelActions: PanelActions,
@@ -83,6 +85,6 @@ fun CommandScreen(
         EXAMPLES.forEach { example ->
             TextButton(onClick = { text = example }) { Text(example) }
         }
-        AssistantPanel(state = state, actions = panelActions, showRawJson = showRawJson)
+        AssistantPanel(state = state, actions = panelActions, showRawJson = showRawJson, speaking = speaking, showConfidence = showConfidence)
     }
 }

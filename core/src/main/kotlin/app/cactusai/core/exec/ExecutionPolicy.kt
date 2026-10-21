@@ -81,6 +81,17 @@ sealed interface Decision {
 object ExecutionPolicy {
     private val sensitiveSettingsPages = setOf("accessibility")
 
+    /** Answered in an instant from the phone's own clock and sensors: nothing is opened, so there is nothing to cancel. */
+    private val instantLocal = setOf(
+        AssistantTools.GET_TIME, AssistantTools.GET_DATE, AssistantTools.DEVICE_INFO, AssistantTools.CALCULATE, AssistantTools.CHECK_BATTERY,
+    )
+
+    /**
+     * True when a command that is about to run by itself should first be shown with a Cancel button. Instant local answers skip it;
+     * anything that opens an app or the browser, taps, scrolls, or changes a setting does not.
+     */
+    fun needsCancelWindow(steps: List<ValidatedCall>): Boolean = steps.any { it.name !in instantLocal }
+
     fun decide(userText: String, response: NeedleResponse, registry: ToolRegistry, config: ExecutionConfig): Decision {
         val plan = Planner.plan(
             userText, response, registry,

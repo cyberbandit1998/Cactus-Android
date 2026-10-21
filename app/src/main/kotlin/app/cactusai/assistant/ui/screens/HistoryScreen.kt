@@ -61,6 +61,7 @@ fun HistoryScreen(entries: List<HistoryEntry>, onClear: () -> Unit) {
                         }
                         entry.interpretation?.let { Text(it, style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace) }
                         Text(entry.message, style = MaterialTheme.typography.bodyMedium)
+                        Text(historyDetail(entry), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         entry.timings?.summary()?.takeIf { it.isNotBlank() }?.let {
                             Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }

@@ -99,6 +99,20 @@ fun ModelsScreen(
                     color = MaterialTheme.colorScheme.error,
                 )
             }
+            if (engine.onlineToolsLeftOut) {
+                Text(
+                    "The questions about sports, weather and general facts were left out because the tool list did not fit. Searching the web by voice still works.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+            if (engine.infoToolsLeftOut) {
+                Text(
+                    "The time, date, phone-fact and calculator tools were left out because the tool list did not fit. The phone actions still work.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
             if (lastTimings == null) {
                 Text(
                     "No timings yet. After you run a command, the measured load, speech, command and total times appear here. This app ships no benchmark numbers: everything shown was measured on your phone.",

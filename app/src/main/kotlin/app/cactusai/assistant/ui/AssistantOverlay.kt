@@ -32,12 +32,15 @@ import app.cactusai.assistant.assistant.AssistantController
 import app.cactusai.assistant.assistant.Phase
 import app.cactusai.assistant.assistant.PermissionNeed
 import app.cactusai.assistant.models.ModelManager
+import app.cactusai.assistant.settings.AppSettings
+import app.cactusai.assistant.speech.SpeechOutput
 import app.cactusai.assistant.ui.components.AssistantPanel
 import app.cactusai.assistant.ui.components.MicButton
 import app.cactusai.assistant.ui.components.PanelActions
 import app.cactusai.assistant.ui.screens.MicActivity
 import app.cactusai.core.history.Outcome
 import app.cactusai.core.models.ModelStatus
+import app.cactusai.core.speech.SpeechState
 import kotlinx.coroutines.delay
 
 /**
@@ -48,16 +51,21 @@ import kotlinx.coroutines.delay
 fun AssistantOverlay(
     controller: AssistantController,
     models: ModelManager,
+    speech: SpeechOutput,
+    settings: AppSettings,
     onClose: () -> Unit,
     onOpenApp: () -> Unit,
 ) {
     val state by controller.state.collectAsStateWithLifecycle()
     val modelStates by models.models.collectAsStateWithLifecycle()
     val missingModels = modelStates.values.any { it.status !is ModelStatus.Installed }
+    val speechState by speech.state.collectAsStateWithLifecycle()
+    val prefs by settings.state.collectAsStateWithLifecycle()
+    val speaking = speechState == SpeechState.SPEAKING
 
-    // After a plain success (nothing to read or tap) hand the screen back to the app underneath.
-    LaunchedEffect(state.phase, state.outcome, state.results.size) {
-        if (state.phase == Phase.DONE && state.outcome == Outcome.SUCCESS && state.results.isEmpty()) {
+    // After a plain success (nothing to read or tap, no answer to read) hand the screen back to the app underneath.
+    LaunchedEffect(state.phase, state.outcome, state.results.size, state.answers.size) {
+        if (state.phase == Phase.DONE && state.outcome == Outcome.SUCCESS && state.results.isEmpty() && state.answers.isEmpty()) {
             delay(2_000)
             onClose()
         }
@@ -75,6 +83,7 @@ fun AssistantOverlay(
             },
             onGrantPermission = { _: PermissionNeed -> onOpenApp() },
             onOpenAccessibility = onOpenApp,
+            onStopSpeaking = controller::stopSpeaking,
         )
     }
 
@@ -110,13 +119,17 @@ fun AssistantOverlay(
                         onStop = controller::stopListening,
                         size = 96.dp,
                     )
+                    Text("Microphone: ${state.micState.label}", style = MaterialTheme.typography.titleSmall)
                     if (listening) {
-                        MicActivity(level = state.micLevel, elapsedMs = state.elapsedMs)
+                        MicActivity(
+                            level = state.micLevel, elapsedMs = state.elapsedMs, speechDetected = state.speechDetected,
+                            autoStopSeconds = state.autoStopSeconds, maxSeconds = state.maxRecordSeconds,
+                        )
                     } else if (state.busy) {
                         OutlinedButton(onClick = controller::cancel) { Text("Cancel") }
                     }
                 }
-                AssistantPanel(state = state, actions = actions, showRawJson = false)
+                AssistantPanel(state = state, actions = actions, showRawJson = false, speaking = speaking, showConfidence = prefs.assistant.showConfidence)
                 TextButton(onClick = onOpenApp) { Text("Open the app") }
             }
         }

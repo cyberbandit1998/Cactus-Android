@@ -6,12 +6,14 @@ import app.cactusai.assistant.actions.AppCatalog
 import app.cactusai.assistant.actions.ContactsLookup
 import app.cactusai.assistant.actions.DeviceActions
 import app.cactusai.assistant.actions.FileSearch
+import app.cactusai.assistant.actions.InfoWiring
 import app.cactusai.assistant.assistant.AssistantController
 import app.cactusai.assistant.audio.MicRecorder
 import app.cactusai.assistant.engine.EngineHost
 import app.cactusai.assistant.history.HistoryRepository
 import app.cactusai.assistant.models.ModelManager
 import app.cactusai.assistant.settings.AppSettings
+import app.cactusai.assistant.speech.SpeechOutput
 import app.cactusai.assistant.system.NetworkMonitor
 import app.cactusai.assistant.system.ThermalMonitor
 import app.cactusai.core.engine.NativeEngine
@@ -41,8 +43,14 @@ class AppContainer(app: Application) {
 
     val apps = AppCatalog(app)
     val contacts = ContactsLookup(app)
-    private val executor = AndroidActionExecutor(app, apps, contacts, DeviceActions(app), FileSearch(app), network, settings)
+    private val device = DeviceActions(app)
     val recorder = MicRecorder(app)
 
-    val controller = AssistantController(app, scope, settings, engine, recorder, executor, history, apps, thermal)
+    /** The phone's own text-to-speech. Never speaks while the microphone is open. */
+    val speech = SpeechOutput(app, settings, microphoneActive = { recorder.isActive })
+
+    private val info = InfoWiring.create(app, settings, network, device)
+    private val executor = AndroidActionExecutor(app, apps, contacts, device, FileSearch(app), network, settings, info)
+
+    val controller = AssistantController(app, scope, settings, engine, recorder, executor, info, speech, history, apps, thermal)
 }

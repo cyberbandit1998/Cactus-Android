@@ -20,7 +20,6 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -47,7 +46,6 @@ import app.cactusai.assistant.system.ThermalMonitor
 import app.cactusai.assistant.ui.components.SectionCard
 import app.cactusai.core.engine.NativeLib
 import app.cactusai.core.models.Models
-import kotlin.math.roundToInt
 
 @Composable
 fun SettingsScreen(
@@ -58,6 +56,7 @@ fun SettingsScreen(
 ) {
     val context = LocalContext.current
     val settings by container.settings.state.collectAsState()
+    val history by container.history.entries.collectAsState()
     val thermal by container.thermal.status.collectAsState()
     var refresh by remember { mutableIntStateOf(0) }
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { refresh++ }
@@ -126,7 +125,7 @@ fun SettingsScreen(
                 style = MaterialTheme.typography.bodyLarge,
             )
             Text(
-                "Lets you say things like \"scroll down\", \"go back\", \"tap search\" and \"type hello\". It looks at the screen only to find what you named and keeps nothing. It never types into password or payment fields, does not act inside Android's permission or install screens, and asks before risky taps such as Pay or Delete. " +
+                "Lets you say things like \"scroll down\", \"go back\", \"tap search\" and \"type hello\", and lets me read a web search's results aloud. It looks at the screen only for that and keeps nothing. It never reads or types into password or payment fields, does not act inside Android's permission or install screens, and asks before risky taps such as Pay or Delete. " +
                     "You turn it on yourself in Android's Accessibility settings and can turn it off there at any time.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -149,19 +148,7 @@ fun SettingsScreen(
             OutlinedButton(onClick = { startAppInfo(context) }) { Text("Review or revoke in Android settings") }
         }
 
-        SectionCard(title = "Confirmations") {
-            SwitchRow("Confirm before calls and texts", "Cactus AI only ever opens a filled-in dialer or message. This also asks you first.", settings.confirmCallsAndTexts) { on ->
-                container.settings.update { it.copy(confirmCallsAndTexts = on) }
-            }
-            Text("Act without asking at ${(settings.actThreshold * 100).roundToInt()}% confidence or more", style = MaterialTheme.typography.bodyMedium)
-            Slider(
-                value = settings.actThreshold,
-                onValueChange = { v -> container.settings.update { it.copy(actThreshold = (v * 20).roundToInt() / 20f) } },
-                valueRange = 0.5f..0.95f,
-                steps = 8,
-            )
-            Text("Below that, the command is shown to you first. Higher is safer.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
+        AssistantSettingsSections(container, history)
 
         SectionCard(title = "Files") {
             Text(
@@ -186,7 +173,7 @@ fun SettingsScreen(
         SectionCard(title = "Privacy") {
             Text(
                 "Everything runs on this phone: speech recognition, command understanding and your history. There is no account, no analytics, no ads and no cloud AI. " +
-                    "The internet is used only to download the models and for web searches you ask for. Recordings are not saved. The engine's own usage reporting is switched off.",
+                    "The internet is used only to download the models, and by your browser for web searches and questions you ask. Recordings are not saved and never leave the phone. The engine's own usage reporting is switched off.",
                 style = MaterialTheme.typography.bodyMedium,
             )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -261,7 +248,7 @@ fun SettingsScreen(
 }
 
 @Composable
-private fun SwitchRow(title: String, description: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+internal fun SwitchRow(title: String, description: String, checked: Boolean, onChange: (Boolean) -> Unit) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f).padding(end = 12.dp)) {
             Text(title, style = MaterialTheme.typography.bodyLarge)

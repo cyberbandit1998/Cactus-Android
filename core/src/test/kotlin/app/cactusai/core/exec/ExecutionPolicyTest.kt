@@ -261,4 +261,18 @@ class ExecutionPolicyTest {
             assertFalse(ExecutionPolicy.assess(ValidatedCall(reg.find(name)!!, ToolArgs(emptyMap())), config).automatic)
         }
     }
+
+    @Test
+    fun onlyInstantLocalAnswersSkipTheCancelWindow() {
+        fun steps(vararg calls: String): List<app.cactusai.core.tools.ValidatedCall> {
+            val d = decide("x", "[" + calls.joinToString(",") + "]")
+            return (d as Decision.RunNow).steps
+        }
+        assertEquals(false, ExecutionPolicy.needsCancelWindow(steps(call("get_time"))))
+        assertEquals(false, ExecutionPolicy.needsCancelWindow(steps(call("check_battery"))))
+        assertEquals(true, ExecutionPolicy.needsCancelWindow(steps(call("open_app", """{"app_name":"Spotify"}"""))))
+        assertEquals(true, ExecutionPolicy.needsCancelWindow(steps(call("get_time"), call("open_app", """{"app_name":"Spotify"}"""))))
+        // opens the browser, so it can be cancelled
+        assertEquals(true, ExecutionPolicy.needsCancelWindow(steps(call("answer_question", """{"question":"Who invented the telephone?"}"""))))
+    }
 }

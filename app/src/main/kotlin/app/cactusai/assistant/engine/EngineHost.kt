@@ -18,6 +18,7 @@ import app.cactusai.core.needle.Transcriptions
 import app.cactusai.core.tools.AssistantTools
 import app.cactusai.core.tools.ToolDetail
 import app.cactusai.core.tools.ToolGroup
+import app.cactusai.core.tools.ToolLadder
 import app.cactusai.core.tools.ToolRegistry
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -50,9 +51,13 @@ data class EngineState(
     val needleInitMs: Long? = null,
     /** How much wording of the tool list the engine accepted (shorter levels are fallbacks). */
     val toolDetail: ToolDetail? = null,
-    /** True when even the shortest list did not fit with the screen tools, so they were left out. */
-    val screenToolsLeftOut: Boolean = false,
-)
+    /** Tool groups the engine could not fit in its context window and so were left out (screen control first, then online, then local information). */
+    val toolGroupsLeftOut: Set<ToolGroup> = emptySet(),
+) {
+    val screenToolsLeftOut: Boolean get() = ToolGroup.SCREEN in toolGroupsLeftOut
+    val onlineToolsLeftOut: Boolean get() = ToolGroup.ONLINE in toolGroupsLeftOut
+    val infoToolsLeftOut: Boolean get() = ToolGroup.INFO in toolGroupsLeftOut
+}
 
 enum class FailureKind { NOT_LINKED, MODEL_MISSING, LOAD_FAILED, INFERENCE_FAILED, BAD_OUTPUT }
 
@@ -81,7 +86,7 @@ data class InterpretOutput(
 class EngineHost(
     private val engine: InferenceEngine,
     private val store: ModelStore,
-    private val registry: ToolRegistry = AssistantTools.registry,
+    private val registry: ToolRegistry = AssistantTools.full,
     private val today: () -> String = { SimpleDateFormat("yyyy-MM-dd EEE", Locale.US).format(Date()) },
     private val localeTag: () -> String = { Locale.getDefault().toLanguageTag() },
 ) {
@@ -220,18 +225,15 @@ class EngineHost(
      *
      * `needle_init` fails when the prompt does not fit the context window, and the size of this
      * assistant's tool list versus that window cannot be known without the phone. So it tries the full
-     * wording first, then shorter wording, and as a last resort leaves out the optional screen tools,
-     * remembering which worked.
+     * wording first, then shorter wording, and as a last resort leaves out whole groups (screen control, then the
+     * online questions, then local information; the phone actions are never dropped), remembering which worked.
      */
     private fun ensureInitialised(groups: Set<ToolGroup>): HostResult<Long?> {
         val facts = AssistantTools.systemFacts(today(), localeTag())
         val signature = registry.signature(groups) + "|" + facts
         if (signature == initializedSignature) return HostResult.Ok(null)
 
-        val ladder = buildList {
-            ToolDetail.entries.forEach { add(groups to it) }
-            if (ToolGroup.SCREEN in groups) add((groups - ToolGroup.SCREEN) to ToolDetail.MINIMAL)
-        }
+        val ladder = ToolLadder.steps(groups)
         val start = System.nanoTime()
         var lastError = "unknown error"
         for ((tryGroups, detail) in ladder) {
@@ -243,7 +245,7 @@ class EngineHost(
                     val ms = elapsedMs(start)
                     _state.value = _state.value.copy(
                         needlePrefixTokens = r.value, needleInitMs = ms, toolDetail = detail,
-                        screenToolsLeftOut = ToolGroup.SCREEN in groups && ToolGroup.SCREEN !in tryGroups,
+                        toolGroupsLeftOut = groups - tryGroups,
                     )
                     return HostResult.Ok(ms)
                 }

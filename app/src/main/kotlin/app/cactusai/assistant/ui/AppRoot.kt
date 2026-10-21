@@ -43,6 +43,7 @@ import app.cactusai.assistant.ui.screens.SettingsScreen
 import app.cactusai.core.engine.NativeLib
 import app.cactusai.core.models.ModelKind
 import app.cactusai.core.models.ModelStatus
+import app.cactusai.core.speech.SpeechState
 
 enum class Tab(val label: String, val icon: ImageVector) {
     HOME("Home", Icons.Default.Home),
@@ -64,6 +65,8 @@ fun AppRoot(container: AppContainer, startListening: Boolean) {
     val settings by container.settings.state.collectAsStateWithLifecycle()
     val history by container.history.entries.collectAsStateWithLifecycle()
     val thermal by container.thermal.status.collectAsStateWithLifecycle()
+    val speechState by container.speech.state.collectAsStateWithLifecycle()
+    val speaking = speechState == SpeechState.SPEAKING
 
     val micLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) {
@@ -96,6 +99,7 @@ fun AppRoot(container: AppContainer, startListening: Boolean) {
                 }
             },
             onOpenAccessibility = { openAccessibilitySettings(context) },
+            onStopSpeaking = controller::stopSpeaking,
         )
     }
 
@@ -132,6 +136,9 @@ fun AppRoot(container: AppContainer, startListening: Boolean) {
                     engineProblem = NativeLib.lastLoadError(),
                     thermalWarning = thermalWarning,
                     showRawJson = settings.expandRawJson,
+                    autoStop = settings.assistant.autoStop,
+                    showConfidence = settings.assistant.showConfidence,
+                    speaking = speaking,
                     onStartListening = controller::startListening,
                     onStopListening = controller::stopListening,
                     onCancel = controller::cancel,
@@ -142,6 +149,8 @@ fun AppRoot(container: AppContainer, startListening: Boolean) {
                     state = state,
                     ready = commandReady,
                     showRawJson = settings.expandRawJson,
+                    speaking = speaking,
+                    showConfidence = settings.assistant.showConfidence,
                     onSubmit = controller::submitText,
                     onCancel = controller::cancel,
                     panelActions = panelActions,

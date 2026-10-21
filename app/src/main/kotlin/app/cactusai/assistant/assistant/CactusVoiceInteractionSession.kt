@@ -49,6 +49,8 @@ class CactusVoiceInteractionSession(context: Context) : VoiceInteractionSession(
                 AssistantOverlay(
                     controller = container.controller,
                     models = container.models,
+                    speech = container.speech,
+                    settings = container.settings,
                     onClose = { hide() },
                     onOpenApp = {
                         context.startActivity(Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
@@ -69,8 +71,9 @@ class CactusVoiceInteractionSession(context: Context) : VoiceInteractionSession(
     }
 
     override fun onHide() {
-        // Stop the microphone and any pending work as soon as the overlay goes away.
-        if (container.controller.isBusy) container.controller.cancel()
+        // Stop the microphone and anything still waiting for the user as soon as the overlay goes away. A command that is already
+        // running is left to finish: opening the browser for a search is what hides the overlay.
+        container.controller.onOverlayHidden()
         owner.stop()
         super.onHide()
     }

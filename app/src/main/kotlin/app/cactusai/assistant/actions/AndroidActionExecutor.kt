@@ -13,6 +13,7 @@ import app.cactusai.assistant.a11y.ScreenResult
 import app.cactusai.assistant.settings.AppSettings
 import app.cactusai.assistant.system.NetworkMonitor
 import app.cactusai.assistant.system.Permissions
+import app.cactusai.core.ask.InfoExecutor
 import app.cactusai.core.match.AppRole
 import app.cactusai.core.match.AppRoles
 import app.cactusai.core.match.Candidate
@@ -46,20 +47,47 @@ class AndroidActionExecutor(
     private val files: FileSearch,
     private val network: NetworkMonitor,
     private val settings: AppSettings,
+    /** Answers the information tools (time, date, device, sports, weather, questions) and reads search results aloud. */
+    private val info: InfoExecutor,
 ) : StepExecutor {
 
+    /** The way the executor was built before the information tools existed; they are then wired from the same phone services. */
+    constructor(
+        context: Context,
+        apps: AppCatalog,
+        contacts: ContactsLookup,
+        device: DeviceActions,
+        files: FileSearch,
+        network: NetworkMonitor,
+        settings: AppSettings,
+    ) : this(context, apps, contacts, device, files, network, settings, InfoWiring.create(context, settings, network, device))
+
     override suspend fun execute(call: ValidatedCall): StepOutcome = try {
+        when {
+            info.handles(call.name) -> info.execute(call)
+            else -> executePhoneAction(call)
+        }
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: ActivityNotFoundException) {
+        StepOutcome.Unavailable("No app on this phone can do that.")
+    } catch (e: SecurityException) {
+        StepOutcome.Failure("Android did not allow that action (${e.message}).")
+    } catch (e: RuntimeException) {
+        StepOutcome.Failure("That did not work: ${e.message ?: e::class.java.simpleName}")
+    }
+
+    private suspend fun executePhoneAction(call: ValidatedCall): StepOutcome {
         val a = call.args
-        when (call.name) {
+        return when (call.name) {
             AssistantTools.OPEN_APP -> openApp(a.string("app_name").orEmpty())
-            AssistantTools.SEARCH_WEB -> searchWeb(a.string("query").orEmpty(), SearchSite.fromKey(a.string("site")))
+            AssistantTools.SEARCH_WEB -> searchWeb(a.string("query").orEmpty(), SearchSite.fromKey(a.string("site")), a.string("site"))
             AssistantTools.OPEN_SETTINGS -> openSettings(a.string("page").orEmpty())
             AssistantTools.SET_TIMER -> setTimer((a.long("hours") ?: 0) * 3600 + (a.long("minutes") ?: 0) * 60 + (a.long("seconds") ?: 0))
             AssistantTools.SET_ALARM -> setAlarm(a.int("hour") ?: 0, a.int("minute") ?: 0, a.string("label"))
             AssistantTools.CALL_CONTACT -> callContact(a.string("name").orEmpty())
             AssistantTools.DIAL_NUMBER -> dialNumber(a.string("number"))
             AssistantTools.SEND_TEXT -> sendText(a.string("recipient").orEmpty(), a.string("message").orEmpty())
-            AssistantTools.CHECK_BATTERY -> StepOutcome.Success(device.batteryStatus())
             AssistantTools.CHANGE_VOLUME -> StepOutcome.Success(device.changeVolume(a.string("action").orEmpty(), a.int("level")))
             AssistantTools.SEARCH_PHONE -> searchPhone(a.string("kind").orEmpty(), a.string("query"))
             AssistantTools.SCROLL -> screen { it.scroll(a.string("direction") == "down") }
@@ -70,14 +98,6 @@ class AndroidActionExecutor(
             AssistantTools.FIND_ON_SCREEN -> screen { it.findOnScreen(a.string("text").orEmpty()) }
             else -> StepOutcome.Failure("I do not know how to do ${call.name}.")
         }
-    } catch (e: CancellationException) {
-        throw e
-    } catch (e: ActivityNotFoundException) {
-        StepOutcome.Unavailable("No app on this phone can do that.")
-    } catch (e: SecurityException) {
-        StepOutcome.Failure("Android did not allow that action (${e.message}).")
-    } catch (e: RuntimeException) {
-        StepOutcome.Failure("That did not work: ${e.message ?: e::class.java.simpleName}")
     }
 
     /** Runs a tapped result row (an app, a number, a file). The row's action was built by this app, not by the model. */
@@ -178,10 +198,13 @@ class AndroidActionExecutor(
 
     // ---- web and settings ----
 
-    private fun searchWeb(query: String, site: SearchSite): StepOutcome {
+    private suspend fun searchWeb(query: String, site: SearchSite, siteKey: String?): StepOutcome {
         if (!network.isOnline()) {
             return StepOutcome.Unavailable("You are offline. Searching ${site.label} needs an internet connection; understanding your command still works without one.")
         }
+        // With reading switched on, a Google search is opened in the browser and its results are read back to the user. The text that
+        // comes back is only ever shown and spoken; it is never run as a command.
+        info.searchAndRead(query, siteKey)?.let { return info.outcomeOf(it) }
         start(Intent(Intent.ACTION_VIEW, Uri.parse(site.searchUrl(query))))
         return StepOutcome.Success("Searching ${site.label} for “$query”.")
     }

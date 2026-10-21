@@ -44,6 +44,9 @@ fun HomeScreen(
     engineProblem: String?,
     thermalWarning: String?,
     showRawJson: Boolean,
+    autoStop: Boolean,
+    showConfidence: Boolean,
+    speaking: Boolean,
     onStartListening: () -> Unit,
     onStopListening: () -> Unit,
     onCancel: () -> Unit,
@@ -99,13 +102,23 @@ fun HomeScreen(
             onStop = onStopListening,
         )
 
+        // The microphone's state, always in words: Idle, Listening, Speech detected or Processing.
+        Text(
+            "Microphone: ${state.micState.label}",
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+        )
         if (listening) {
-            MicActivity(level = state.micLevel, elapsedMs = state.elapsedMs)
+            MicActivity(
+                level = state.micLevel, elapsedMs = state.elapsedMs, speechDetected = state.speechDetected,
+                autoStopSeconds = state.autoStopSeconds, maxSeconds = state.maxRecordSeconds,
+            )
         } else {
             Text(
                 text = when {
                     state.busy -> state.status.ifBlank { "Working…" }
                     !voiceEnabled -> "Voice is turned off"
+                    autoStop -> "Tap once and speak. I stop when you stop talking. Or hold to talk."
                     else -> "Hold to talk, or tap once to start and again to send"
                 },
                 style = MaterialTheme.typography.bodyLarge,
@@ -118,23 +131,38 @@ fun HomeScreen(
             OutlinedButton(onClick = onCancel) { Text(if (listening) "Cancel and discard" else "Cancel") }
         }
 
-        AssistantPanel(state = state, actions = panelActions, showRawJson = showRawJson)
+        AssistantPanel(state = state, actions = panelActions, showRawJson = showRawJson, speaking = speaking, showConfidence = showConfidence)
         Spacer(Modifier.height(24.dp))
     }
 }
 
-/** Always-visible sign that the microphone is on, with a live loudness bar and the elapsed time. */
+/** Always-visible sign that the microphone is on, with a live loudness bar, the elapsed time and what ends the recording. */
 @Composable
-fun MicActivity(level: Float, elapsedMs: Long) {
+fun MicActivity(
+    level: Float,
+    elapsedMs: Long,
+    speechDetected: Boolean = false,
+    autoStopSeconds: Float? = null,
+    maxSeconds: Int = 30,
+) {
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth().semantics { liveRegion = LiveRegionMode.Polite }) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(12.dp).background(MaterialTheme.colorScheme.error, CircleShape))
             Spacer(Modifier.width(8.dp))
             val seconds = elapsedMs / 1000
-            Text("Microphone is on · ${seconds / 60}:${(seconds % 60).toString().padStart(2, '0')}", style = MaterialTheme.typography.titleMedium)
+            Text(
+                "${if (speechDetected) "Speech detected" else "Listening"} · ${seconds / 60}:${(seconds % 60).toString().padStart(2, '0')}",
+                style = MaterialTheme.typography.titleMedium,
+            )
         }
         Spacer(Modifier.height(8.dp))
         LinearProgressIndicator(progress = { level.coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth(0.6f))
-        Text("Up to 30 seconds. Nothing is saved.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        val hint = when {
+            autoStopSeconds == null -> "Tap the microphone again when you are done."
+            speechDetected -> "I stop after ${String.format(java.util.Locale.US, "%.1f", autoStopSeconds)} s of quiet. Tap the microphone to stop now."
+            else -> "Start speaking. I stop ${String.format(java.util.Locale.US, "%.1f", autoStopSeconds)} s after you finish."
+        }
+        Text(hint, style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center)
+        Text("Up to $maxSeconds seconds. Nothing is saved.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
