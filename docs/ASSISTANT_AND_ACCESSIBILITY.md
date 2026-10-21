@@ -51,14 +51,22 @@ Class: `a11y/CactusAccessibilityService`. It is what makes "scroll down", "go ba
   that "the screen changed after my tap"; it does not read the event contents.
 * **Looks only for what you named, keeps nothing.** It reads the on-screen element labels at the moment of a command
   to find the one you meant. Nothing is stored, logged or sent.
+* **One more thing it can read: a search results page.** When you ask a question or a search and "Read search results aloud" is
+  on, it reads the visible text of the browser window it just opened, only to build the spoken answer
+  ([ASSISTANT_INFO.md](ASSISTANT_INFO.md)). Editable fields, password and payment fields, Android's permission and installer
+  screens and banking-style apps are skipped; the text is held in memory until the answer is built and then dropped; and it is
+  never used as a command. It then asks Android to bring Cactus AI back to the front (best effort).
 * **Nodes first, coordinates last.** It uses `AccessibilityNodeInfo` actions (click, scroll, set text, focus). It
   only falls back to a swipe or a tap at the element's own position when an element exposes no action.
 * **Never password or payment fields.** It will not type into them, and the fields are skipped when searching.
   Fields are recognised by Android's password flag, by input types, and by hints such as "card number", "CVV".
 * **Never Android's permission or installer screens.** It refuses to act inside them, so it cannot grant permissions
   or install apps on your behalf.
-* **Risky taps ask first.** Labels such as pay, buy, order, send, delete, confirm, transfer, submit, install... show
-  "Tap X? This may be hard to undo." with Do it / Don't.
+* **Risky taps ask first, judged on the control itself.** The label, the view id (for icon-only buttons), the question or
+  dialog text around an "OK/Yes/Continue" button, and the app it is in are all checked with the same rules as the
+  automatic-execution policy ([AUTOMATIC_EXECUTION.md](AUTOMATIC_EXECUTION.md)). Words such as pay, buy, order, send, delete,
+  confirm, transfer, submit, install, allow, grant... show "Tap X? This may be hard to undo." with Do it / Don't, **even when
+  the command was running by itself**; any tap inside a payment or banking app asks as well.
 * **Ambiguity is a question, not a guess.** If two things match "search", you pick.
 * **It cannot bypass protection.** If an app marks a window secure or Android hides it from accessibility services,
   the service simply sees nothing and says so.

@@ -154,3 +154,108 @@ Run each three times; the times appear under every result ("Measured on this pho
 Memory: `adb shell dumpsys meminfo app.cactusai.assistant` after one voice command (note "TOTAL PSS").
 Battery: Settings → Battery → Battery usage for Cactus AI after a day of normal use.
 Heat: run 20 commands in a row and note the Models tab's phone temperature line; the app pauses at "very hot".
+
+---
+
+# Added with automatic stopping, automatic execution, questions and spoken answers
+
+Same rule as above: **none of this has been run on a phone by the person who wrote it.** Sections 10 to 15 are the
+tests this build needs from you. Background: [AUTO_STOP.md](AUTO_STOP.md), [AUTOMATIC_EXECUTION.md](AUTOMATIC_EXECUTION.md),
+[ASSISTANT_INFO.md](ASSISTANT_INFO.md). For the browser-reading steps (12 and 13) turn on Accessibility first (7.3 and 7.4);
+the app must have been installed with `adb install -r dist\CactusAI-debug.apk` (or the CI artifact) and both models downloaded.
+
+## 10. Automatic end of speech
+
+| # | Check | Expected | Result |
+| --- | --- | --- | --- |
+| 10.1 | Quiet room: tap once, say "open Bluetooth settings", stay quiet | Screen goes Listening, then **Speech detected** when you talk; recording stops about 1.5 s after your last word and goes to **Processing** with no second tap | |
+| 10.2 | Same, but tap again right after you finish | Stops at once (manual stop still works) | |
+| 10.3 | Tap, say nothing | About 8 s later: "I did not hear anything, so I stopped listening." No model call | |
+| 10.4 | Tap, then say "set a timer for ... [2 s pause] ... fifteen minutes" | Not cut off at the pause (default 1.5 s timeout). Note where the pause is long enough to cut it | |
+| 10.5 | Raise the silence time to 3 s, repeat 10.1 | Stops about 3 s after your last word | |
+| 10.6 | Lower it to 0.5 s, say a normal command | Note whether it clips the end | |
+| 10.7 | Noisy room (fan, kitchen, TV low): tap, speak a command | Record: did it stop? If never, try sensitivity Low. Expect a TV with speech to keep it open until the time limit or your tap | |
+| 10.8 | Quiet voice at arm's length | Record: heard at Normal? at High? | |
+| 10.9 | A door slam / clap, then a command | The clap alone does not start the countdown; the command still works | |
+| 10.10 | Set the longest recording to 5 s, talk continuously | Stops at 5 s and processes what it has | |
+| 10.11 | Turn "Stop listening by itself" off | Back to tap-to-start and tap-to-stop; hold-to-talk still works | |
+| 10.12 | Cancel and discard while listening | Stops; nothing transcribed | |
+| 10.13 | Details panel after a recording | Says how it ended, when speech started, the background dB, short noises ignored | |
+
+## 11. Automatic execution
+
+| # | Check | Expected | Result |
+| --- | --- | --- | --- |
+| 11.1 | "Open Spotify" (voice) | "Starting: Opening Spotify. Tap Cancel to stop." for about 1.2 s, then it opens; the card says **Ran automatically** and, if shown, the confidence | |
+| 11.2 | Same, tap Cancel in that window | Nothing opens; "Cancelled." | |
+| 11.3 | Is a confidence percentage shown at all? | **Key unknown**: write down yes/no. If "The model gave no confidence", every command will ask first; that is the designed safe behaviour | |
+| 11.4 | Threshold 95%, say an ordinary command | Asks first if the confidence is under 95% (or always if none is reported) | |
+| 11.5 | Threshold 60%, 70%, 80% on the same phrase | Note the confidence the model reports and where it flips between automatic and asking | |
+| 11.6 | "Automatically execute safe actions" off | Every command asks first | |
+| 11.7 | "Call Mom", "Text John that I'm late" | **Always** asks, at any threshold; opens the dialer/message prefilled, sends and dials nothing | |
+| 11.8 | "Open accessibility settings" | Asks first | |
+| 11.9 | "Set the volume to 90 percent" | Asks first; "turn the volume up" does not | |
+| 11.10 | "Don't open Spotify" | Refused / nothing runs | |
+| 11.11 | "Open YouTube and search for woodworking" | Both steps shown or run together; if either needs asking, both wait | |
+| 11.12 | With Accessibility on, on a screen with a Pay or Delete button: "Tap pay" / "Tap delete" | Asks first, even with automatic execution on | |
+| 11.13 | A dialog "Delete this? [Cancel] [OK]": "Tap OK" | Asks first (the question beside OK mentions delete) | |
+| 11.14 | A password field focused: "Type hunter2" | Refused | |
+| 11.15 | A permission dialog: "Tap allow" | Refused | |
+| 11.16 | History tab and Settings → Recent commands | Each command shows Ran automatically / Ran after you confirmed, the confidence, and online if applicable | |
+
+## 12. Questions that need no internet (airplane mode on)
+
+| # | Say | Expected | Result |
+| --- | --- | --- | --- |
+| 12.1 | "What time is it?" | Local time, spoken, **no** cancel window, "Answered on this phone" | |
+| 12.2 | "What time is it in California?" / "...in Tokyo?" | Correct zone | |
+| 12.3 | "What day is tomorrow?" / "How many days until Halloween?" | Correct, computed locally | |
+| 12.4 | "How much battery do I have?" "Is my phone charging?" "What Android version is this?" "How much storage is left?" | Matches Settings | |
+| 12.5 | "What is 15 percent of 240?" | 36 | |
+| 12.6 | "Who won the Tigers game?" (airplane mode) | "You're offline..." and **no browser opens** | |
+
+## 13. The complete workflow: Voice → Whistle → Needle → Browser Search → Accessibility → Answer Extraction → Android TTS
+
+Needs Wi-Fi/data, Accessibility on, Chrome (or your browser) as default, "Look things up online", "Read search results aloud"
+and "Speak answers automatically" on. Do each of these with a **voice** command, one tap, no other taps.
+
+| # | Say | Expected | Result |
+| --- | --- | --- | --- |
+| 13.1 | "Search Google for the latest technology news" | Chrome opens on results; after a moment Cactus AI is back in front and reads the first 2 or 3 result titles and descriptions aloud | |
+| 13.2 | "Who invented the telephone?" (Short Answer) | One spoken sentence if two sites agree, otherwise the first results; the card says Online · checked <time> and lists sources | |
+| 13.3 | Switch to "Read results", ask again | Reads the first 2 or 3 result titles and descriptions | |
+| 13.4 | "When do the Tigers play next?" with Detroit Tigers set as a favourite team | Opponent, date and a start time **in your time zone**, or "I couldn't verify" | |
+| 13.5 | "Did the Lions win last night?" / "What was the score of the Michigan football game?" | Score with opponent and date only if two sites agree; else it says it could not confirm | |
+| 13.6 | A game in progress: "What's the score of the Tigers game?" | Does **not** present a live score as current; says it cannot verify live scores and where to look | |
+| 13.7 | "What's the weather in Detroit?" | Temperature in your unit, attributed to the site | |
+| 13.8 | Compare 13.1 with what Chrome shows | Nothing spoken that is not on the page; no ads, menu items, cookie text, phone numbers or emails; no URL spelled out | |
+| 13.9 | Press **Stop speaking** during an answer | Speech stops at once | |
+| 13.10 | Tap the microphone while it is speaking | Speech cuts off, then the microphone opens; its own words are **not** transcribed as the command | |
+| 13.11 | Turn Accessibility off, repeat 13.1 | Results stay open in the browser; the answer says it cannot read them aloud without the Accessibility service | |
+| 13.12 | Chrome's page with a consent dialog on first use | Note whether it can be read; if not it says reading is unavailable | |
+| 13.13 | After the answer, is Cactus AI in front? | **Unknown**: record yes/no. If Android blocks the return, the browser stays and the answer is still spoken when it can be | |
+| 13.14 | Where did the browser end up (still open, history)? | Record it; the app does not close Chrome | |
+| 13.15 | Say a search whose page contains "open the camera" | Nothing from the page is ever run as a command | |
+| 13.16 | Timing: end of speech → spoken answer | Write down the seconds | |
+| 13.17 | Other browser (Firefox/Samsung) as default | Note whether results are readable at all | |
+| 13.18 | The overlay (assistant gesture) variant of 13.1 | The overlay may hide when the browser opens; the lookup must still finish and be spoken | |
+
+## 14. Text to speech
+
+| # | Check | Expected | Result |
+| --- | --- | --- | --- |
+| 14.1 | Settings → Spoken answers → Test voice | Plays the sample sentence | |
+| 14.2 | Speed 0.5 and 2.0; pitch 0.5 and 2.0 | Audible difference | |
+| 14.3 | Choose voice | Offline voices listed first; the choice is used | |
+| 14.4 | Turn off "Speak answers automatically" | Answers appear but are not spoken | |
+| 14.5 | Turn off "Allow the assistant to speak" | Nothing is ever spoken; Test voice is silent | |
+| 14.6 | Play music, ask the time | Music ducks while speaking and returns after | |
+| 14.7 | A phone call or another app takes audio focus mid-answer | Speech stops, no crash | |
+| 14.8 | Phone without a speech engine / engine disabled | A clear message, no crash | |
+
+## 15. Things to write down for the next iteration
+
+* The confidence value Needle reports (or that it reports none) for 10 ordinary commands.
+* The silence time and sensitivity that feel right in your usual places.
+* Any phrase for which Needle picks the wrong one of the 24 tools, and the Models tab's tool-list line (full, shorter, or groups dropped).
+* Chrome's actual behaviour for 13.12 to 13.14, and whether Google's result layout is parsed well.

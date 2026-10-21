@@ -92,7 +92,10 @@ More: [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md).
 
 ## What it can do
 
-Say or type; Needle picks one of these 17 tools (`core/.../tools/AssistantTools.kt`).
+Say or type; Needle picks one of these 24 tools (17 phone actions and 7 information tools; `core/.../tools/AssistantTools.kt`).
+Tap the microphone once and speak: Cactus AI notices when you stop ([docs/AUTO_STOP.md](docs/AUTO_STOP.md)), and low-risk actions the
+model is confident about run by themselves after a moment in which you can cancel, while anything sensitive always asks first
+([docs/AUTOMATIC_EXECUTION.md](docs/AUTOMATIC_EXECUTION.md)).
 
 | You say | Tool | What the app does |
 | --- | --- | --- |
@@ -106,7 +109,11 @@ Say or type; Needle picks one of these 17 tools (`core/.../tools/AssistantTools.
 | "What's my battery?" | `check_battery` | Reads the level |
 | "Turn the volume up / mute / set volume to 40" | `change_volume` | Media volume |
 | "Show my installed apps", "Find John in my contacts", "Find my resume file" | `search_phone` | Apps; contacts (with permission); files only in folders you chose |
-| "Scroll down", "Go back", "Tap search", "Select the first result", "Type hello", "Is Settings on screen" | `scroll`, `navigate`, `tap_text`, `tap_result`, `type_text`, `find_on_screen` | Optional Accessibility service |
+| "Scroll down", "Go back", "Tap search", "Select the first result", "Type hello", "Is Settings on screen" | `scroll`, `navigate`, `tap_text`, `tap_result`, `type_text`, `find_on_screen` | Optional Accessibility service; risky targets (pay, delete, send...) always ask |
+| "What time is it in California?", "What day is tomorrow?", "How many days until Halloween?" | `get_time`, `get_date` | Computed on the phone, offline |
+| "How much battery is left?", "How much storage is free?", "What Android version?" | `device_info`, `check_battery` | Public Android APIs, offline, no permission |
+| "What is 15 percent of 240?" | `calculate` | Safe arithmetic parser, offline |
+| "When do the Tigers play?", "Did the Lions win?", "What's the weather?", "Who invented the telephone?" | `sports_info`, `weather_info`, `answer_question` | Opens a Google search in your browser, reads the results through the Accessibility service, checks scores and times against two sources, and **speaks** the answer with Android text-to-speech ([docs/ASSISTANT_INFO.md](docs/ASSISTANT_INFO.md)) |
 
 Anything unsupported, ambiguous, negated ("don't open ...") or below the confidence threshold is shown or refused,
 never silently guessed. Multi-part commands ("open YouTube and search for woodworking") run step by step with timeouts
@@ -117,7 +124,7 @@ and stop at the first problem.
 Home (big push-to-talk button, microphone indicator, "You said", assistant answer, current action, cancel) ·
 Command (typed commands, interpretation, raw JSON viewer) · History (local, clearable) ·
 Models (download/progress/verify/update-check/delete/reinstall, load status, storage, measured timings, temperature) ·
-Settings (microphone, assistant, accessibility, permissions, confirmations, files, privacy, debugging).
+Settings (microphone, listening and auto-stop, automatic execution, spoken answers, questions and the web, assistant, accessibility, permissions, files, privacy, debugging). Answers show whether they came from this phone or the web, and a Stop speaking button appears while one is read aloud.
 
 ## Digital assistant and accessibility
 
@@ -128,13 +135,13 @@ may reserve for Google's own assistant.
 ## Privacy
 
 Everything runs on the phone. See [docs/PRIVACY.md](docs/PRIVACY.md). Short version: the only network traffic is the
-model download and web searches you ask for; recordings are never saved; history is local and deletable; the vendor
+model download and the web searches and questions you ask (made by your browser; no Ollama, no cloud AI, no API key); recordings are never saved; history is local and deletable; the vendor
 engine's telemetry is switched off (and you can verify the data counter stays at zero).
 
 ## Tests
 
 ```powershell
-.\gradlew.bat :core:test                          # 120+ JVM tests: safety rules, parsers, downloader, JNI glue (test double)
+.\gradlew.bat :core:test                          # 389 JVM tests: safety rules, parsers, downloader, JNI glue (test double), speech detection, execution policy, answers
 .\gradlew.bat :app:testDebugUnitTest              # small Android-module unit tests
 .\gradlew.bat :app:connectedDebugAndroidTest      # ON A REAL arm64 PHONE: real models, real actions, assistant, UI
 .\gradlew.bat :app:connectedDebugAndroidTest "-Pandroid.testInstrumentationRunnerArguments.offline=true"   # Wi-Fi/data off scenario

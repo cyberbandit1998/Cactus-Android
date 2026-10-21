@@ -122,3 +122,30 @@ The hosts and sizes above are a snapshot from 2026-10-20; the app reads the real
 * Anything beyond what the repositories' `LICENSE` files and model cards declare about the engine and weights (see 2.5).
 * That the engine's file I/O is harmless (see 2.3).
 
+## 6. Added with automatic execution and spoken answers
+
+### 6.1 Needle's confidence value (from upstream documentation and code; the Android build has not been run)
+
+* The engine's JSON envelope for `needle_complete` carries a calibrated `confidence` between 0 and 1 and a `suppressed_calls`
+  list; both are documented in the Needle repository, together with the note that weights without the calibration head
+  return no confidence. The existing JNI shim passes the envelope through unchanged and `NeedleResponses.parse` reads the
+  value (null when absent or outside 0..1).
+* **Unknown until the Pixel 7 run:** whether the Needle 3 weights this app downloads return a confidence value on Android.
+  The app never estimates one: with no number, every command is shown to you first, and the screen says so.
+
+### 6.2 Decisions that replaced earlier ideas
+
+* **No Ollama, no web-search API, no API key.** An earlier request asked for an Ollama web search; a later one replaced it
+  with reading the user's own browser through the Accessibility service and said not to add Ollama, Rust or cloud AI
+  services. The later request was followed. The code and tests contain none of: an HTTP client for search, a stored key, an
+  Ollama or other AI endpoint (a test scans the shipped sources for such names).
+* **No extra voice-activity model.** End-of-speech detection is a loudness-and-variation detector in plain Kotlin, tuned on
+  synthetic audio only (docs/AUTO_STOP.md).
+* **Text-to-speech** is Android's `TextToSpeech` with the phone's engine; no speech synthesis library was added.
+
+### 6.3 Not verified at all (needs the Pixel 7)
+
+Real-voice behaviour of the end-of-speech detector; Chrome's accessibility tree for a Google results page (headings, link
+addresses, ads, consent screens) and whether the parser's rules hold on it; whether Android lets the app return to the front
+after a search; the system voice; how well Needle chooses between 24 tools in the context window it has; the speed of the whole
+voice-to-answer path.
