@@ -107,7 +107,8 @@ object VoiceTurn {
     /**
      * Record, then transcribe as soon as the recording ends, with no further tap: the whole spoken part of
      * "tap, speak, get the text". [transcribe] is called at most once and never for a cancelled recording or
-     * one in which no speech was found.
+     * one in which no speech was found. The app uses [VoiceCapture.capture] and [afterCapture] separately so
+     * that it can release the microphone between the two.
      */
     suspend fun <T> listenAndTranscribe(
         source: PcmSource,
@@ -121,6 +122,16 @@ object VoiceTurn {
     ): VoiceTurnResult<T> {
         val audio = VoiceCapture.capture(source, config, stopRequested, onUpdate)
         onRecorded(audio)
+        return afterCapture(audio, trimSilence, beforeTranscribe, transcribe)
+    }
+
+    /** Everything after the recording: skip empty or too-short audio, then transcribe once. */
+    suspend fun <T> afterCapture(
+        audio: CapturedAudio,
+        trimSilence: Boolean,
+        beforeTranscribe: () -> String? = { null },
+        transcribe: suspend (FloatArray) -> T,
+    ): VoiceTurnResult<T> {
         if (audio.reason == EndReason.NO_SPEECH) return VoiceTurnResult.NothingHeard(audio, NothingHeardReason.NO_SPEECH_TIMEOUT)
         beforeTranscribe()?.let { return VoiceTurnResult.Blocked(it, audio) }
 

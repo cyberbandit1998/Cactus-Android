@@ -188,4 +188,28 @@ class VoiceCaptureTest {
         assertEquals(0, audio.length)
         assertEquals(0, source.reads)
     }
+
+    @Test
+    fun theMicrophoneCanBeReleasedBetweenRecordingAndTranscription() = runBlocking {
+        var open = true
+        val source = SignalSource(phrase())
+        val audio = VoiceCapture.capture(source, CaptureConfig(), { false })
+        open = false // the app closes the microphone here
+        var openDuringTranscription: Boolean? = null
+        val result = VoiceTurn.afterCapture(audio, trimSilence = true) { _ ->
+            openDuringTranscription = open
+            "open spotify"
+        }
+        assertTrue(result is VoiceTurnResult.Transcribed)
+        assertEquals(false, openDuringTranscription)
+    }
+
+    @Test
+    fun aRecordingWithNoSpeechIsNotTranscribedWhenSplitEither() = runBlocking {
+        val audio = VoiceCapture.capture(SignalSource(noise(9000, room)), CaptureConfig(), { false })
+        val calls = AtomicInteger()
+        val result = VoiceTurn.afterCapture(audio, trimSilence = true) { _ -> calls.incrementAndGet(); "x" }
+        assertTrue(result is VoiceTurnResult.NothingHeard)
+        assertEquals(0, calls.get())
+    }
 }
